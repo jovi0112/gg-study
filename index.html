@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>果果学习版 v7</title>
+<title>果果学习版 v7.1</title>
 <style>
 :root{--bg:#f4f6fa;--card:#fff;--ink:#1c2333;--sub:#66708a;--pri:#3b6ef5;--pri2:#eef3ff;--ok:#1a9e5c;--warn:#c2410c;--line:#e3e8f2;--red:#d64545}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -63,7 +63,7 @@ details{margin-top:6px}summary{cursor:pointer;color:var(--pri);font-size:13px}
 </style>
 </head>
 <body>
-<header><b>果果学习版 <i>v7</i></b><span style="display:flex;gap:8px;align-items:center"><span id="qChip" onclick="quotaInfo()" title="累计AI流量">⚡…</span><button class="btn sm" onclick="showTab('tab-set')">⚙ 设置</button></span></header>
+<header><b>果果学习版 <i>v7.1</i></b><span style="display:flex;gap:8px;align-items:center"><span id="qChip" onclick="quotaInfo()" title="累计AI流量">⚡…</span><button class="btn sm" onclick="showTab('tab-set')">⚙ 设置</button></span></header>
 <nav id="tabs">
   <button class="on" data-t="tab-ask" onclick="showTab('tab-ask')">💬 讲题</button>
   <button data-t="tab-photo" onclick="showTab('tab-photo')">📷 拍题</button>
@@ -193,20 +193,44 @@ const SUBJ={
  umath:{n:"高等数学"},ueng:{n:"大学英语"},uphy:{n:"大学物理"},ucode:{n:"编程基础"},uother:{n:"其它"}};
 const STAGES={
  "小学":{grades:["一年级","二年级","三年级","四年级","五年级","六年级"],subj:["math","chin","eng"]},
- "初中":{grades:["初一","初二","初三"],subj:["math","chin","eng","phys","chem","pol","his","geo","bio"]},
+ "初中":{grades:["初一","初二","初三"]},
  "高中":{grades:["高一","高二","高三"],subj:["math","chin","eng","phys","chem","bio","pol","his","geo"]},
  "大学":{grades:["大一","大二","大三","大四"],subj:["umath","ueng","uphy","ucode","uother"]}};
+/* 初中科目按年级联动：物理初二起、化学初三起 */
+function subjOf(stg,grade){
+  if(stg==="初中"){
+    if(grade==="初三")return["math","chin","eng","phys","chem","pol","his","geo","bio"];
+    if(grade==="初二")return["math","chin","eng","phys","pol","his","geo","bio"];
+    return["math","chin","eng","pol","his","geo","bio"];}
+  return (STAGES[stg]||STAGES["初中"]).subj||[]
+}
+/* 章节 按 学段.年级.科目 预置（人教/统编目录）；旧式 学段.科目 作高中等兜底 */
 const CHAPS={
  "小学.math":["20以内加减法","表内乘除法","分数的初步认识","小数的初步认识","简易方程","长方形与正方形"],
- "初中.math":["有理数","有理数的运算","整式加减","一元一次方程","几何图形初步"],
- "初中.chin":["春/济南的冬天","散文诗二首","从百草园到三味书屋","朝花夕拾名著导读","文言文《世说新语》二则"],
- "初中.eng":["My classmates","Daily routines","My family","My school day","一般现在时"],
- "初中.pol":["中学时代","认识自我","友谊与成长","师长情谊"],
- "初中.his":["史前时期","夏商周","秦汉","三国两晋南北朝"],
- "初中.geo":["地球与地图","陆地和海洋","天气与气候","居民与聚落"],
- "初中.bio":["生物与环境","生物体的结构层次","绿色植物","人体的呼吸"],
- "初中.phys":["声现象","光现象","物态变化","电流和电路","电压电阻","欧姆定律"],
- "初中.chem":["走进化学世界","我们周围的空气","物质构成的奥秘","自然界的水","化学方程式","碳和碳的氧化物","金属和金属材料","溶液","酸和碱"],
+ "初中.初一.math":["有理数","有理数的运算","整式加减","一元一次方程","几何图形初步","相交线与平行线","实数","平面直角坐标系","二元一次方程组","不等式与不等式组"],
+ "初中.初二.math":["三角形","全等三角形","轴对称","整式的乘法与因式分解","分式","二次根式","勾股定理","平行四边形","一次函数","数据的分析"],
+ "初中.初三.math":["一元二次方程","二次函数","旋转","圆","概率初步","反比例函数","相似","锐角三角函数","投影与视图"],
+ "初中.初一.chin":["春/济南的冬天","散文诗二首","从百草园到三味书屋","朝花夕拾名著导读","文言文《世说新语》二则"],
+ "初中.初二.chin":["消息二则（新闻）","藤野先生","回忆我的母亲","背影","白杨礼赞","苏州园林/中国石拱桥（说明文）","红星照耀中国（名著）"],
+ "初中.初三.chin":["岳阳楼记","醉翁亭记","湖心亭看雪","我的叔叔于勒","范进中举","曹刿论战","出师表","儒林外史（名著）"],
+ "初中.初一.eng":["My classmates","Daily routines","My family","My school day","一般现在时"],
+ "初中.初二.eng":["一般过去时","比较级与最高级","be going to 计划","情态动词与邀请","祈使句与制作过程"],
+ "初中.初三.eng":["现在完成时","被动语态","宾语从句","定语从句","used to 与过去习惯"],
+ "初中.初一.pol":["中学时代","认识自我","友谊与成长","师长情谊"],
+ "初中.初二.pol":["丰富的社会生活","网络生活新空间","社会生活讲道德","做守法的公民","勇担社会责任","维护国家利益"],
+ "初中.初三.pol":["坚持宪法至上","公民权利与义务","文明与家园","民主与法治","我们的共同世界"],
+ "初中.初一.his":["史前时期","夏商周","秦汉","三国两晋南北朝"],
+ "初中.初二.his":["鸦片战争","洋务运动与甲午战争","戊戌变法与辛亥革命","新文化运动与五四运动","抗日战争","人民解放战争"],
+ "初中.初三.his":["中华人民共和国成立与巩固","社会主义建设探索","建设中国特色社会主义","民族团结与祖国统一","文艺复兴与新航路开辟","工业革命"],
+ "初中.初一.geo":["地球与地图","陆地和海洋","天气与气候","居民与聚落"],
+ "初中.初二.geo":["疆域与人口","中国的自然资源","中国的自然环境","中国的经济发展","四大地理区域"],
+ "初中.初三.geo":["中考总复习·中国地理","中考总复习·世界地理"],
+ "初中.初一.bio":["生物与环境","生物体的结构层次","绿色植物","人体的呼吸"],
+ "初中.初二.bio":["动物的主要类群","动物的运动和行为","细菌和真菌","病毒","生物的生殖和发育","生物的遗传和变异","健康地生活"],
+ "初中.初三.bio":["中考总复习·生物与环境","中考总复习·遗传与变异","中考总复习·健康地生活"],
+ "初中.初二.phys":["机械运动","声现象","物态变化","光现象","透镜及其应用","质量与密度","力","运动和力","压强","浮力","功和机械能","简单机械"],
+ "初中.初三.phys":["内能","内能的利用","电流和电路","电压 电阻","欧姆定律","电功率","生活用电","电与磁"],
+ "初中.初三.chem":["走进化学世界","我们周围的空气","物质构成的奥秘","自然界的水","化学方程式","碳和碳的氧化物","燃料及其利用","金属和金属材料","溶液","酸和碱","盐 化肥"],
  "高中.math":["集合与常用逻辑用语","一元二次函数、方程和不等式","指数函数与对数函数","三角函数","数列","立体几何初步","解析几何初步","统计与概率"],
  "高中.phys":["运动的描述","匀变速直线运动","相互作用","运动和力的关系","功和机械能"],
  "高中.chem":["物质及其变化","海水中重要的非金属元素","物质的量与化学计算","原子结构与元素周期律"],
@@ -271,16 +295,17 @@ async function chat(messages,opts){
 /* ---------- 学科选择 ---------- */
 function renderSubj(){
   const stg=STAGES[S.stage]||STAGES["初中"];
-  if(!stg.subj.includes(S.subj))S.subj=stg.subj[0];
+  const subs=subjOf(S.stage,S.grade);
+  if(!subs.includes(S.subj))S.subj=subs[0];
   if(!stg.grades.includes(S.grade))S.grade=stg.grades[0];
   const sbox=D.getElementById("stageChips");sbox.innerHTML="";
-  Object.keys(STAGES).forEach(k=>{const b=D.createElement("span");b.className="chip"+(S.stage===k?" on":"");b.textContent=k;b.onclick=()=>{S.stage=k;if(!STAGES[k].grades.includes(S.grade))S.grade=STAGES[k].grades[0];if(!STAGES[k].subj.includes(S.subj))S.subj=STAGES[k].subj[0];save();renderSubj()};sbox.appendChild(b)});
+  Object.keys(STAGES).forEach(k=>{const b=D.createElement("span");b.className="chip"+(S.stage===k?" on":"");b.textContent=k;b.onclick=()=>{S.stage=k;if(!STAGES[k].grades.includes(S.grade))S.grade=STAGES[k].grades[0];if(!subjOf(k,S.grade).includes(S.subj))S.subj=subjOf(k,STAGES[k].grades[0])[0];save();renderSubj()};sbox.appendChild(b)});
   const gs=D.getElementById("gradeSel");
   gs.innerHTML=stg.grades.map(g=>'<option'+(g===S.grade?" selected":"")+'>'+esc(g)+'</option>').join("");
-  ["subjChips","mapChips"].forEach(id=>{const box=D.getElementById(id);box.innerHTML="";stg.subj.forEach(k=>{const b=D.createElement("span");b.className="chip"+(S.subj===k?" on":"");b.textContent=SUBJ[k].n;b.onclick=()=>{S.subj=k;save();renderSubj()};box.appendChild(b)})});
+  ["subjChips","mapChips"].forEach(id=>{const box=D.getElementById(id);box.innerHTML="";subs.forEach(k=>{const b=D.createElement("span");b.className="chip"+(S.subj===k?" on":"");b.textContent=SUBJ[k].n;b.onclick=()=>{S.subj=k;save();renderSubj()};box.appendChild(b)})});
   const cw=D.getElementById("chapWrap"),sel=D.getElementById("chapSel");
   cw.classList.remove("hide");
-  const chaps=CHAPS[S.stage+"."+S.subj]||[];
+  const chaps=CHAPS[S.stage+"."+S.grade+"."+S.subj]||CHAPS[S.stage+"."+S.subj]||[];
   sel.innerHTML='<option value="">（不指定章节）</option>'+chaps.map(c=>'<option>'+esc(c)+'</option>').join("");
 }
 /* ---------- 讲题核心：思路分支引导（v6，绝不直接给答案） ---------- */
@@ -678,7 +703,7 @@ function testCfg(){
 }
 
 /* ---------- 启动 ---------- */
-D.getElementById("gradeSel").addEventListener("change",e=>{S.grade=e.target.value;save();toast("已切到"+S.grade)});
+D.getElementById("gradeSel").addEventListener("change",e=>{S.grade=e.target.value;if(!subjOf(S.stage,S.grade).includes(S.subj))S.subj=subjOf(S.stage,S.grade)[0];save();renderSubj();toast("已切到"+S.grade+"，科目和章节已同步")});
 renderSubj();fillCfg();drawQuota();
 if(S.hist.length){const box=D.getElementById("askResult");S.hist.slice(0,5).forEach(h=>{
   const card=D.createElement("div");card.className="card";
