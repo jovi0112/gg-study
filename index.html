@@ -37,12 +37,18 @@ textarea{min-height:74px;resize:vertical}
 .hist{border-top:1px solid var(--line);padding-top:10px;margin-top:10px}
 .hist-q{font-size:13px;color:var(--sub);white-space:pre-wrap;word-break:break-word}
 /* 导图 */
-.tree{overflow-x:auto}
-.tnode{border-left:2px solid var(--pri);margin-left:10px;padding-left:10px;position:relative}
+.treewrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.tree{width:max-content;min-width:100%;padding-right:16px}
+.tnode{border-left:2px solid var(--pri);margin-left:8px;padding-left:10px;position:relative}
 .tnode::before{content:"";position:absolute;left:-2px;top:0;width:10px;height:14px;border-bottom:2px solid var(--pri)}
-.tlabel{display:inline-block;background:var(--pri2);color:var(--pri);border-radius:8px;padding:4px 10px;font-size:13px;margin:4px 0;font-weight:500}
+.tlabel{display:inline-block;background:var(--pri2);color:var(--pri);border-radius:8px;padding:4px 10px;font-size:13px;margin:4px 0;font-weight:500;white-space:nowrap}
+.tlabel.has-kids{cursor:pointer}
+.tlabel.has-kids::after{content:" ▾";opacity:.55;font-size:11px}
+.tkids.folded{display:none}
 .troot>.tlabel{background:var(--pri);color:#fff;font-weight:600;font-size:14px}
 .tleaf .tlabel{background:#fff;border:1px solid var(--line);color:var(--ink)}
+/* 顶栏流量 */
+#qChip{font-size:12px;background:var(--pri2);color:var(--pri);border-radius:10px;padding:3px 8px;cursor:pointer;user-select:none;white-space:nowrap}
 /* 错题本 */
 .wcard{border:1px solid var(--line);border-radius:12px;padding:10px;margin-bottom:8px;background:#fff}
 .wcard .qtext{font-size:14px}
@@ -60,7 +66,7 @@ details{margin-top:6px}summary{cursor:pointer;color:var(--pri);font-size:13px}
 </style>
 </head>
 <body>
-<header><b>果果学习版 <i>v2</i></b><button class="btn sm" onclick="showTab('tab-set')">⚙ 设置</button></header>
+<header><b>果果学习版 <i>v2</i></b><span style="display:flex;gap:8px;align-items:center"><span id="qChip" onclick="quotaInfo()" title="累计AI流量">⚡…</span><button class="btn sm" onclick="showTab('tab-set')">⚙ 设置</button></span></header>
 <nav id="tabs">
   <button class="on" data-t="tab-ask" onclick="showTab('tab-ask')">💬 讲题</button>
   <button data-t="tab-photo" onclick="showTab('tab-photo')">📷 拍题</button>
@@ -126,7 +132,8 @@ details{margin-top:6px}summary{cursor:pointer;color:var(--pri);font-size:13px}
   </div>
   <div class="card hide" id="mapCard">
     <h3 id="mapTitle"></h3>
-    <div class="tree" id="mapTree"></div>
+    <div class="state">内容看不全时 ← 左右滑动 →；点带 ▾ 的标签可折叠/展开分支</div>
+    <div class="treewrap"><div class="tree" id="mapTree"></div></div>
     <div class="via" id="mapVia"></div>
   </div>
   <div class="card">
@@ -208,11 +215,27 @@ const DEF={aliUrl:"https://dashscope.aliyuncs.com/compatible-mode/v1/chat/comple
 function cfg(){return Object.assign({},DEF,S.cfg||{})}
 function fillCfg(){const c=cfg();D.getElementById("cfgAliUrl").value=c.aliUrl;D.getElementById("cfgAliKey").value=c.aliKey;D.getElementById("cfgAliTxt").value=c.aliTxt;D.getElementById("cfgAliVl").value=c.aliVl;D.getElementById("cfgDsKey").value=c.dsKey}
 function saveCfg(){S.cfg={aliUrl:D.getElementById("cfgAliUrl").value.trim(),aliKey:D.getElementById("cfgAliKey").value.trim(),aliTxt:D.getElementById("cfgAliTxt").value.trim(),aliVl:D.getElementById("cfgAliVl").value.trim(),dsKey:D.getElementById("cfgDsKey").value.trim()};save();toast("配置已保存")}
+function fmtTok(n){n=Number(n)||0;return n>=10000?(n/10000).toFixed(1)+"万":n>=1000?(n/1000).toFixed(1)+"k":String(n)}
+function addUsage(tag,n){
+  S.usage=S.usage||{ali:0,ds:0,n:0};
+  if(String(tag).indexOf("阿里")===0)S.usage.ali+=n;else S.usage.ds+=n;
+  S.usage.n++;save();drawQuota();
+}
+function drawQuota(){
+  const u=S.usage||{ali:0,ds:0,n:0};
+  D.getElementById("qChip").textContent="⚡"+fmtTok(u.ali+u.ds);
+}
+function quotaInfo(){
+  const u=S.usage||{ali:0,ds:0,n:0};
+  toast("累计AI流量 "+fmtTok(u.ali+u.ds)+" tokens（阿里 "+fmtTok(u.ali)+" · DeepSeek "+fmtTok(u.ds)+" · "+u.n+" 次调用）。余额/剩余免费额度请到百炼控制台「费用用量」查看（免费额度100万tokens，2026-11-30到期，用完即停）。");
+}
 async function api(url,key,body,tag){
   const r=await fetch(url,{method:"POST",headers:{Authorization:"Bearer "+key,"Content-Type":"application/json"},body:JSON.stringify(body)});
   if(!r.ok){const t=await r.text().catch(()=>"");let m=t;try{m=JSON.parse(t).error&&JSON.parse(t).error.message||t}catch(e){}
     throw new Error(tag+" HTTP"+r.status+" "+String(m).slice(0,120))}
-  const j=await r.json();const msg=j.choices&&j.choices[0]&&j.choices[0].message;
+  const j=await r.json();
+  try{const u=j.usage&&j.usage.total_tokens;if(u)addUsage(tag,u)}catch(e){}
+  const msg=j.choices&&j.choices[0]&&j.choices[0].message;
   if(msg&&typeof msg.content==="object"&&msg.content!==null)return {text:(msg.content.find(x=>x.type==="text")||{}).text||"",via:tag};
   return {text:(msg&&msg.content||"").trim(),via:tag}
 }
@@ -381,9 +404,11 @@ function renderMap(spec,via){
   D.getElementById("mapVia").textContent="通道："+(via||"");
   function treeHTML(n,depth){
     const kids=(n.children||[]).map(k=>'<div class="tnode'+(k.children&&k.children.length?"":" tleaf")+'">'+treeHTML(k,depth+1)+'</div>').join("");
-    return '<span class="tlabel">'+esc(n.label)+'</span>'+(kids?'<div style="margin-left:0">'+kids+'</div>':"");
+    if(kids)return '<span class="tlabel has-kids" onclick="tgNode(this)">'+esc(n.label)+'</span><div class="tkids">'+kids+'</div>';
+    return '<span class="tlabel">'+esc(n.label)+'</span>';
   }
 }
+function tgNode(el){const d=el.nextElementSibling;if(d)d.classList.toggle("folded")}
 function renderMapHist(){
   const box=D.getElementById("mapHist");
   if(!S.maps.length){box.innerHTML='<div class="state">还没有生成过导图</div>';return}
@@ -458,7 +483,7 @@ function testCfg(){
 }
 
 /* ---------- 启动 ---------- */
-renderSubj();setMode(S.mode);fillCfg();
+renderSubj();setMode(S.mode);fillCfg();drawQuota();
 if(S.hist.length){const box=D.getElementById("askResult");S.hist.slice(0,5).forEach(h=>{
   const card=D.createElement("div");card.className="card";
   card.innerHTML='<div class="qtext">'+esc(h.q)+'</div><div style="margin-bottom:6px"><span class="tag">'+esc(SUBJ[h.subj]?SUBJ[h.subj].n:h.subj||"")+(h.chap?("·"+esc(h.chap)):"")+'</span></div><div class="answer">'+fmt(h.text)+'</div><div class="via">'+new Date(h.t).toLocaleString("zh-CN")+(h.via?(" · "+esc(h.via)):"")+'</div>';
