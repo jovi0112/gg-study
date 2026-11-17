@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>果果学习版 v6</title>
+<title>果果学习版 v7</title>
 <style>
 :root{--bg:#f4f6fa;--card:#fff;--ink:#1c2333;--sub:#66708a;--pri:#3b6ef5;--pri2:#eef3ff;--ok:#1a9e5c;--warn:#c2410c;--line:#e3e8f2;--red:#d64545}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -63,7 +63,7 @@ details{margin-top:6px}summary{cursor:pointer;color:var(--pri);font-size:13px}
 </style>
 </head>
 <body>
-<header><b>果果学习版 <i>v6</i></b><span style="display:flex;gap:8px;align-items:center"><span id="qChip" onclick="quotaInfo()" title="累计AI流量">⚡…</span><button class="btn sm" onclick="showTab('tab-set')">⚙ 设置</button></span></header>
+<header><b>果果学习版 <i>v7</i></b><span style="display:flex;gap:8px;align-items:center"><span id="qChip" onclick="quotaInfo()" title="累计AI流量">⚡…</span><button class="btn sm" onclick="showTab('tab-set')">⚙ 设置</button></span></header>
 <nav id="tabs">
   <button class="on" data-t="tab-ask" onclick="showTab('tab-ask')">💬 讲题</button>
   <button data-t="tab-photo" onclick="showTab('tab-photo')">📷 拍题</button>
@@ -77,7 +77,9 @@ details{margin-top:6px}summary{cursor:pointer;color:var(--pri);font-size:13px}
 <section id="tab-ask">
   <div class="card">
     <h3>今天问哪科？</h3>
-    <div class="chips" id="subjChips"></div>
+    <div class="chips" id="stageChips"></div>
+    <select id="gradeSel" style="margin-top:8px;width:auto;min-width:130px"></select>
+    <div class="chips" id="subjChips" style="margin-top:8px"></div>
     <div id="chapWrap" style="margin-top:8px" class="hide">
       <select id="chapSel"></select>
     </div>
@@ -185,19 +187,39 @@ details{margin-top:6px}summary{cursor:pointer;color:var(--pri);font-size:13px}
 <script>
 "use strict";
 /* ---------- 基础数据 ---------- */
+/* 科目全集（各学段复用）；章节按 学段.科目 预置"富裕量"，空=章节直接写进题目 */
 const SUBJ={
- math:{n:"数学",chaps:["有理数","有理数的运算","整式加减","一元一次方程","几何图形初步"]},
- chin:{n:"语文",chaps:["春/济南的冬天","散文诗二首","从百草园到三味书屋","朝花夕拾名著导读","文言文《世说新语》二则"]},
- eng:{n:"英语",chaps:["My classmates","Daily routines","My family","My school day","一般现在时"]},
- pol:{n:"道法",chaps:["中学时代","认识自我","友谊与成长","师长情谊"]},
- his:{n:"历史",chaps:["史前时期","夏商周","秦汉","三国两晋南北朝"]},
- geo:{n:"地理",chaps:["地球与地图","陆地和海洋","天气与气候","居民与聚落"]},
- bio:{n:"生物",chaps:["生物与环境","生物体的结构层次","绿色植物","人体的呼吸"]}};
+ math:{n:"数学"},chin:{n:"语文"},eng:{n:"英语"},pol:{n:"道法"},his:{n:"历史"},geo:{n:"地理"},bio:{n:"生物"},phys:{n:"物理"},chem:{n:"化学"},
+ umath:{n:"高等数学"},ueng:{n:"大学英语"},uphy:{n:"大学物理"},ucode:{n:"编程基础"},uother:{n:"其它"}};
+const STAGES={
+ "小学":{grades:["一年级","二年级","三年级","四年级","五年级","六年级"],subj:["math","chin","eng"]},
+ "初中":{grades:["初一","初二","初三"],subj:["math","chin","eng","phys","chem","pol","his","geo","bio"]},
+ "高中":{grades:["高一","高二","高三"],subj:["math","chin","eng","phys","chem","bio","pol","his","geo"]},
+ "大学":{grades:["大一","大二","大三","大四"],subj:["umath","ueng","uphy","ucode","uother"]}};
+const CHAPS={
+ "小学.math":["20以内加减法","表内乘除法","分数的初步认识","小数的初步认识","简易方程","长方形与正方形"],
+ "初中.math":["有理数","有理数的运算","整式加减","一元一次方程","几何图形初步"],
+ "初中.chin":["春/济南的冬天","散文诗二首","从百草园到三味书屋","朝花夕拾名著导读","文言文《世说新语》二则"],
+ "初中.eng":["My classmates","Daily routines","My family","My school day","一般现在时"],
+ "初中.pol":["中学时代","认识自我","友谊与成长","师长情谊"],
+ "初中.his":["史前时期","夏商周","秦汉","三国两晋南北朝"],
+ "初中.geo":["地球与地图","陆地和海洋","天气与气候","居民与聚落"],
+ "初中.bio":["生物与环境","生物体的结构层次","绿色植物","人体的呼吸"],
+ "初中.phys":["声现象","光现象","物态变化","电流和电路","电压电阻","欧姆定律"],
+ "初中.chem":["走进化学世界","我们周围的空气","物质构成的奥秘","自然界的水","化学方程式","碳和碳的氧化物","金属和金属材料","溶液","酸和碱"],
+ "高中.math":["集合与常用逻辑用语","一元二次函数、方程和不等式","指数函数与对数函数","三角函数","数列","立体几何初步","解析几何初步","统计与概率"],
+ "高中.phys":["运动的描述","匀变速直线运动","相互作用","运动和力的关系","功和机械能"],
+ "高中.chem":["物质及其变化","海水中重要的非金属元素","物质的量与化学计算","原子结构与元素周期律"],
+ "高中.bio":["细胞是生命活动的基本单位","细胞的组成与结构","细胞的代谢","细胞的增殖与分化"],
+ "高中.pol":["中国特色社会主义","经济与社会","政治与法治","哲学与文化"],
+ "高中.his":["中华文明的起源与早期国家","春秋战国与秦汉","三国两晋南北朝的民族交融","辽宋夏金元","明清中国版图的奠定","晚清时期的内忧外患"],
+ "高中.geo":["宇宙中的地球","地球上的大气","地球上的水","地貌","植被与土壤","自然灾害"]};
+function ageOf(){const m={"一年级":"小学生","二年级":"小学生","三年级":"小学生","四年级":"小学生","五年级":"小学生","六年级":"小学生","初一":"13岁初一学生","初二":"14岁初二学生","初三":"15岁初三学生","高一":"16岁高一学生","高二":"17岁高二学生","高三":"高三学生","大一":"大学生","大二":"大学生","大三":"大学生","大四":"大学生"};return m[S.grade]||"中学生"}
 const SUBJ_NAME={};Object.keys(SUBJ).forEach(k=>SUBJ_NAME[k]=SUBJ[k].n);
 const TAGS=["概念不清","计算失误","审题错误","方法不会","粗心笔误"];
 const EBB=[1,2,4,7,15,30];
 const D=document;
-const S=load("gg2",{subj:"math",mode:true,hist:[],wrong:[],maps:[],cfg:null});
+const S=load("gg2",{subj:"math",stage:"初中",grade:"初一",mode:true,hist:[],wrong:[],maps:[],cfg:null});
 function load(k,d){try{const v=localStorage.getItem(k);return v?Object.assign({},d,JSON.parse(v)):Object.assign({},d)}catch(e){return Object.assign({},d)}}
 function save(){try{localStorage.setItem("gg2",JSON.stringify(S))}catch(e){toast("存储失败："+e.message)}}
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
@@ -248,17 +270,23 @@ async function chat(messages,opts){
 
 /* ---------- 学科选择 ---------- */
 function renderSubj(){
-  const box=D.getElementById("subjChips");box.innerHTML="";
-  Object.keys(SUBJ).forEach(k=>{const b=D.createElement("span");b.className="chip"+(S.subj===k?" on":"");b.textContent=SUBJ[k].n;b.onclick=()=>{S.subj=k;save();renderSubj()};box.appendChild(b)});
+  const stg=STAGES[S.stage]||STAGES["初中"];
+  if(!stg.subj.includes(S.subj))S.subj=stg.subj[0];
+  if(!stg.grades.includes(S.grade))S.grade=stg.grades[0];
+  const sbox=D.getElementById("stageChips");sbox.innerHTML="";
+  Object.keys(STAGES).forEach(k=>{const b=D.createElement("span");b.className="chip"+(S.stage===k?" on":"");b.textContent=k;b.onclick=()=>{S.stage=k;if(!STAGES[k].grades.includes(S.grade))S.grade=STAGES[k].grades[0];if(!STAGES[k].subj.includes(S.subj))S.subj=STAGES[k].subj[0];save();renderSubj()};sbox.appendChild(b)});
+  const gs=D.getElementById("gradeSel");
+  gs.innerHTML=stg.grades.map(g=>'<option'+(g===S.grade?" selected":"")+'>'+esc(g)+'</option>').join("");
+  ["subjChips","mapChips"].forEach(id=>{const box=D.getElementById(id);box.innerHTML="";stg.subj.forEach(k=>{const b=D.createElement("span");b.className="chip"+(S.subj===k?" on":"");b.textContent=SUBJ[k].n;b.onclick=()=>{S.subj=k;save();renderSubj()};box.appendChild(b)})});
   const cw=D.getElementById("chapWrap"),sel=D.getElementById("chapSel");
-  cw.classList.remove("hide");const cur=SUBJ[S.subj];
-  sel.innerHTML=cur.chaps.map(c=>'<option>'+esc(c)+'</option>').join("");
-  const mapBox=D.getElementById("mapChips");mapBox.innerHTML="";
-  Object.keys(SUBJ).forEach(k=>{const b=D.createElement("span");b.className="chip"+(S.subj===k?" on":"");b.textContent=SUBJ[k].n;b.onclick=()=>{S.subj=k;save();renderSubj()};mapBox.appendChild(b)});
+  cw.classList.remove("hide");
+  const chaps=CHAPS[S.stage+"."+S.subj]||[];
+  sel.innerHTML='<option value="">（不指定章节）</option>'+chaps.map(c=>'<option>'+esc(c)+'</option>').join("");
 }
 /* ---------- 讲题核心：思路分支引导（v6，绝不直接给答案） ---------- */
-const BASE_SYS="你是给13岁初一学生讲题的老师。铁律：全程简体中文；像家长讲题，不要书面腔；先易后难；题目转述里如有错别字，按上下文猜含义再答，不要纠结；不确定的明说不确定。";
-function branchSys(){return BASE_SYS+"\n你现在处于【思路分支引导】模式——这是本产品最大的特色：绝不直接给答案。规则：\n①第一回合：先用≤50字说这题在问什么，再列1-2条关键线索，最后必须以「你的思路是？说说你打算怎么做，哪怕只想到第一步」结尾。不许开始讲正确解法。\n②孩子说了想法后，严格按这个格式回：\n【跟着你走】按孩子的思路往下推，说清楚照这样做会得到什么结果；\n【岔路口】指出从哪一步开始跑偏、为什么会跑偏（孩子思路里对的部分先肯定）；\n【反问】只提一个问题，把孩子拉回正路。不许在【跟着你走】【岔路口】里给出正确解法或最终答案。\n③孩子每做对一步就明确肯定，再引向下一步。\n④当孩子自己说出正确结果时，第一行以【通关】开头，先肯定，再让孩子用自己的话复述关键的一步。\n⑤孩子连续2轮说不知道时，退一步给更基础的铺垫小问题（比如先问一个更简单的同类题），但仍然不给答案。\n⑥每轮回复≤180字，口语化，多用「你」。\n⑦除非孩子明确点了「看完整讲解」（那时系统会附加指令），全程禁止出现本题的最终数值答案或完整解题步骤。"}
+/* v7：学段锚定——每条提示词都带 学段/年级/科目/章节，并明令不许超纲 */
+function baseSys(){return "你是给"+ageOf()+"讲题的老师。铁律：全程简体中文；像家长讲题，不要书面腔；先易后难；题目转述里如有错别字，按上下文猜含义再答，不要纠结；不确定的明说不确定。讲解深度必须严格贴合"+S.stage+S.grade+"教材：不许用后面年级才学的方法（超纲），也不要过于浅显（降智）。"}
+function branchSys(){return baseSys()+"\n你现在处于【思路分支引导】模式——这是本产品最大的特色：绝不直接给答案。规则：\n①第一回合：先用≤50字说这题在问什么，再列1-2条关键线索，最后必须以「你的思路是？说说你打算怎么做，哪怕只想到第一步」结尾。不许开始讲正确解法。\n②孩子说了想法后，严格按这个格式回：\n【跟着你走】按孩子的思路往下推，说清楚照这样做会得到什么结果；\n【岔路口】指出从哪一步开始跑偏、为什么会跑偏（孩子思路里对的部分先肯定）；\n【反问】只提一个问题，把孩子拉回正路。不许在【跟着你走】【岔路口】里给出正确解法或最终答案。\n③孩子每做对一步就明确肯定，再引向下一步。\n④当孩子自己说出正确结果时，第一行以【通关】开头，先肯定，再让孩子用自己的话复述关键的一步。\n⑤孩子连续2轮说不知道时，退一步给更基础的铺垫小问题（比如先问一个更简单的同类题），但仍然不给答案。\n⑥每轮回复≤180字，口语化，多用「你」。\n⑦除非孩子明确点了「看完整讲解」（那时系统会附加指令），全程禁止出现本题的最终数值答案或完整解题步骤。"}
 let GS=null; // 当前引导会话
 function ask(){
   const q=D.getElementById("qBox").value.trim();
@@ -285,7 +313,7 @@ function startGuided(q,chap){
   const acts=D.createElement("div");acts.className="chips";acts.style.marginTop="8px";
   card.appendChild(chatBox);card.appendChild(st);card.appendChild(inWrap);card.appendChild(acts);
   box.insertBefore(card,box.firstChild);
-  const G=GS={q,chap,rounds:0,done:false,ended:false,revealed:false,via:"",msgs:[{role:"system",content:branchSys()},{role:"user",content:(chap?("科目："+SUBJ[S.subj].n+"，章节："+chap+"。\n"):"")+"题目："+q}],card,chatBox,st,inWrap,ta,send,acts};
+  const G=GS={q,chap,rounds:0,done:false,ended:false,revealed:false,via:"",msgs:[{role:"system",content:branchSys()},{role:"user",content:"学段："+S.stage+S.grade+"，科目："+SUBJ[S.subj].n+(chap?("，章节："+chap):"")+"。\n题目："+q}],card,chatBox,st,inWrap,ta,send,acts};
   send.onclick=()=>gsSend(G);
   gsChip(G,"📕 红笔批改(读心)","（孩子点了「红笔批改」：请暂停引导流程，结合上面整段对话，用红笔批改的口吻指出我可能在哪一步、哪个概念上想岔了——严厉但温和，不嘲笑但不回避。可以点出正确的概念方向，但不要给出本题的最终数值答案。）");
   const rev=D.createElement("span");rev.className="chip";rev.textContent="🔍 看完整讲解";
@@ -324,7 +352,7 @@ function gsSend(G){
   gsStep(G);
 }
 function gsWin(G){
-  gsChip(G,"出3道变式","（孩子已经自己做出这道题了。请围绕它的知识点出3道变式题，由易到难，答案与题目分开、放在最后。）");
+  gsChip(G,"出3道变式","（孩子已经自己做出这道题了。请围绕它的知识点出3道难度贴合"+S.stage+S.grade+"教材的变式题，由易到难，答案与题目分开、放在最后。）");
   const fav=D.createElement("span");fav.className="chip";fav.style.background="#fff7ed";fav.style.color="#c2410c";fav.textContent="＋ 收进错题本";
   fav.onclick=()=>{const talk=G.msgs.filter(m=>m.role==="assistant").slice(0,3).map(m=>m.content).join("\n");addWrong({q:G.q,text:talk.slice(0,1000),tag:"",chap:G.chap||""});toast("已收进错题本")};
   G.acts.insertBefore(fav,G.acts.lastChild);
@@ -487,9 +515,9 @@ async function genMap(){
   const topic=D.getElementById("mapTopic").value.trim()||D.getElementById("chapSel").value||SUBJ[S.subj].n;
   const st=D.getElementById("mapState");st.className="state";st.textContent="AI 画结构中…";
   const HINTS={chin:"组织方式：围绕中心发散联想（内容/写法/名句/考点）。",eng:"组织方式：围绕中心发散（定义/形式/例子/易错点）。",bio:"组织方式：按整体-部分关系组织（组成部分→更细部分）。",his:"组织方式：一级分支按时间先后顺序排列（事件/阶段），体现时间脉络。"};
-  const sys="你是初中老师的板书设计师。你不画图，只输出JSON。为一个初中生梳理知识块，输出格式：{\"title\":\"标题≤12字\",\"root\":{\"label\":\"中心≤8字\",\"children\":[{\"label\":\"分支≤10字\",\"children\":[{\"label\":\"叶子≤12字\"}]}]}}。要求：2-3层，每层2-4个，贴合初一教材，叶子要具体（公式/例子/易错点）。"+(HINTS[S.subj]||"组织方式：按分类层级组织（类目→子类→具体）。")+"只输出JSON，不要其它文字。";
+  const sys="你是初中老师的板书设计师。你不画图，只输出JSON。为"+ageOf()+"梳理知识块，贴合"+S.stage+S.grade+"教材，输出格式：{\"title\":\"标题≤12字\",\"root\":{\"label\":\"中心≤8字\",\"children\":[{\"label\":\"分支≤10字\",\"children\":[{\"label\":\"叶子≤12字\"}]}]}}。要求：2-3层，每层2-4个，知识点和术语不许超出"+S.stage+S.grade+"范围，叶子要具体（公式/例子/易错点）。"+(HINTS[S.subj]||"组织方式：按分类层级组织（类目→子类→具体）。")+"只输出JSON，不要其它文字。";
   try{
-    const {text,via}=await chat([{role:"system",content:sys},{role:"user",content:"学科："+SUBJ[S.subj].n+"，知识块："+topic}],{temp:.3,max:1200});
+    const {text,via}=await chat([{role:"system",content:sys},{role:"user",content:"学段："+S.stage+S.grade+"，学科："+SUBJ[S.subj].n+"，知识块："+topic}],{temp:.3,max:1200});
     const spec=parseJSON(text);
     if(!spec||!spec.root)throw new Error("AI 返回的结构没法解析，再试一次");
     renderMap(spec,via,S.subj);
@@ -650,6 +678,7 @@ function testCfg(){
 }
 
 /* ---------- 启动 ---------- */
+D.getElementById("gradeSel").addEventListener("change",e=>{S.grade=e.target.value;save();toast("已切到"+S.grade)});
 renderSubj();fillCfg();drawQuota();
 if(S.hist.length){const box=D.getElementById("askResult");S.hist.slice(0,5).forEach(h=>{
   const card=D.createElement("div");card.className="card";
