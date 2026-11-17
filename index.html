@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>果果学习版 v2</title>
+<style>
+:root{--bg:#f4f6fa;--card:#fff;--ink:#1c2333;--sub:#66708a;--pri:#3b6ef5;--pri2:#eef3ff;--ok:#1a9e5c;--warn:#c2410c;--line:#e3e8f2;--red:#d64545}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;font:15px/1.55 -apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--ink)}
+header{position:sticky;top:0;z-index:9;background:var(--card);border-bottom:1px solid var(--line);padding:10px 14px;display:flex;justify-content:space-between;align-items:center}
+header b{font-size:16px}header b i{font-style:normal;color:var(--pri);font-size:12px;margin-left:6px}
+nav{display:flex;gap:4px;padding:8px 10px;background:var(--card);border-bottom:1px solid var(--line);position:sticky;top:49px;z-index:8;overflow-x:auto}
+nav button{flex:1;border:0;background:none;padding:7px 4px;font-size:13px;color:var(--sub);border-radius:10px;white-space:nowrap}
+nav button.on{background:var(--pri2);color:var(--pri);font-weight:600}
+main{padding:12px;max-width:560px;margin:0 auto;padding-bottom:40px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:12px}
+.card h3{margin:0 0 8px;font-size:15px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:#fff;border-radius:999px;padding:5px 11px;font-size:13px;color:var(--sub)}
+.chip.on{background:var(--pri);border-color:var(--pri);color:#fff}
+select,textarea,input[type=text]{width:100%;border:1px solid var(--line);border-radius:10px;padding:9px;font-size:14px;font-family:inherit;background:#fff;color:var(--ink)}
+textarea{min-height:74px;resize:vertical}
+.row{display:flex;gap:8px;margin-top:8px}
+.btn{flex:1;border:1px solid var(--line);background:#fff;border-radius:12px;padding:10px;font-size:14px;color:var(--ink)}
+.btn.pri{background:var(--pri);border-color:var(--pri);color:#fff;font-weight:600}
+.btn.sm{padding:7px 10px;font-size:13px;border-radius:10px;flex:none}
+.btn:disabled{opacity:.5}
+.tag{display:inline-block;background:var(--pri2);color:var(--pri);border-radius:6px;padding:2px 8px;font-size:12px;margin-right:6px}
+.tag.red{background:#fdeaea;color:var(--red)}
+.tag.ok{background:#e7f6ee;color:var(--ok)}
+.state{font-size:13px;color:var(--sub);padding:6px 2px}
+.state.err{color:var(--warn)}
+.answer{font-size:15px;white-space:pre-wrap;word-break:break-word}
+.answer b{color:var(--pri)}
+.qtext{font-size:14px;font-weight:600;margin-bottom:6px;white-space:pre-wrap}
+.hist{border-top:1px solid var(--line);padding-top:10px;margin-top:10px}
+.hist-q{font-size:13px;color:var(--sub);white-space:pre-wrap;word-break:break-word}
+/* 导图 */
+.tree{overflow-x:auto}
+.tnode{border-left:2px solid var(--pri);margin-left:10px;padding-left:10px;position:relative}
+.tnode::before{content:"";position:absolute;left:-2px;top:0;width:10px;height:14px;border-bottom:2px solid var(--pri)}
+.tlabel{display:inline-block;background:var(--pri2);color:var(--pri);border-radius:8px;padding:4px 10px;font-size:13px;margin:4px 0;font-weight:500}
+.troot>.tlabel{background:var(--pri);color:#fff;font-weight:600;font-size:14px}
+.tleaf .tlabel{background:#fff;border:1px solid var(--line);color:var(--ink)}
+/* 错题本 */
+.wcard{border:1px solid var(--line);border-radius:12px;padding:10px;margin-bottom:8px;background:#fff}
+.wcard .qtext{font-size:14px}
+.due{font-size:12px;color:var(--warn)}
+.due.today{color:var(--red);font-weight:600}
+details{margin-top:6px}summary{cursor:pointer;color:var(--pri);font-size:13px}
+.bar{height:8px;border-radius:4px;background:var(--line);overflow:hidden;margin:4px 0}
+.bar i{display:block;height:100%;background:var(--pri)}
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1c2333;color:#fff;padding:9px 16px;border-radius:10px;font-size:13px;opacity:0;transition:.3s;pointer-events:none;z-index:99;max-width:85%}
+#toast.show{opacity:.95}
+#previewBox img{max-width:100%;border-radius:10px;margin:8px 0}
+.via{font-size:11px;color:var(--sub);margin-top:8px}
+.variant{border-top:1px dashed var(--line);padding-top:8px;margin-top:8px}
+.hide{display:none}
+</style>
+</head>
+<body>
+<header><b>果果学习版 <i>v2</i></b><button class="btn sm" onclick="showTab('tab-set')">⚙ 设置</button></header>
+<nav id="tabs">
+  <button class="on" data-t="tab-ask" onclick="showTab('tab-ask')">💬 讲题</button>
+  <button data-t="tab-photo" onclick="showTab('tab-photo')">📷 拍题</button>
+  <button data-t="tab-map" onclick="showTab('tab-map')">🧠 导图</button>
+  <button data-t="tab-wrong" onclick="showTab('tab-wrong')">📕 错题本</button>
+  <button data-t="tab-report" onclick="showTab('tab-report')">📊 报告</button>
+</nav>
+<main>
+
+<!-- 讲题 -->
+<section id="tab-ask">
+  <div class="card">
+    <h3>今天问哪科？</h3>
+    <div class="chips" id="subjChips"></div>
+    <div id="chapWrap" style="margin-top:8px" class="hide">
+      <select id="chapSel"></select>
+    </div>
+    <div style="margin-top:10px">
+      <textarea id="qBox" placeholder="把题目打进来，或者说说你卡在哪了…（电脑上还能 Ctrl+V 粘贴截图到拍题页）"></textarea>
+    </div>
+    <div style="margin-top:8px">
+      <span style="font-size:13px;color:var(--sub)">讲法：</span>
+      <span class="chip on" id="mHint" onclick="setMode(true)">🔍 先引导我（不给答案）</span>
+      <span class="chip" id="mFull" onclick="setMode(false)">📖 直接讲清楚</span>
+    </div>
+    <div class="row"><button class="btn pri" id="askBtn" onclick="ask()">问一问</button></div>
+    <div id="askState" class="state"></div>
+  </div>
+  <div id="askResult"></div>
+</section>
+
+<!-- 拍题 -->
+<section id="tab-photo" class="hide">
+  <div class="card">
+    <h3>拍下不会的题</h3>
+    <div class="row">
+      <button class="btn" onclick="pickImage('camera')">📷 拍照</button>
+      <button class="btn" onclick="pickImage('album')">🖼️ 相册 / 截图</button>
+    </div>
+    <input type="file" id="fileIn" accept="image/*" class="hide">
+    <div id="previewBox"></div>
+    <div id="ocrState" class="state"></div>
+    <div id="ocrBox" class="hide">
+      <h3 style="margin-top:8px">AI 抄的题（可改）</h3>
+      <textarea id="ocrText" style="min-height:90px"></textarea>
+      <div class="row">
+        <button class="btn" onclick="useOcr(false)">🔍 引导我讲</button>
+        <button class="btn pri" onclick="useOcr(true)">📖 直接讲清楚</button>
+      </div>
+      <div class="state">抄写员只抄题不讲题；认不出的字会写成 □，记得自己改一下。</div>
+    </div>
+  </div>
+</section>
+
+<!-- 导图 -->
+<section id="tab-map" class="hide">
+  <div class="card">
+    <h3>一图看懂一个知识块</h3>
+    <div class="chips" id="mapChips"></div>
+    <div style="margin-top:10px"><textarea id="mapTopic" placeholder="想梳理哪个知识块？比如：有理数加减法、一般将来时、光的折射…（留空则用上面选的章节）"></textarea></div>
+    <div class="row"><button class="btn pri" onclick="genMap()">🧠 生成思维导图</button></div>
+    <div id="mapState" class="state"></div>
+  </div>
+  <div class="card hide" id="mapCard">
+    <h3 id="mapTitle"></h3>
+    <div class="tree" id="mapTree"></div>
+    <div class="via" id="mapVia"></div>
+  </div>
+  <div class="card">
+    <h3>导图历史</h3>
+    <div id="mapHist"></div>
+  </div>
+</section>
+
+<!-- 错题本 -->
+<section id="tab-wrong" class="hide">
+  <div class="card">
+    <h3>错题本 <span id="dueBadge" class="tag red"></span></h3>
+    <div class="chips" id="wFilter"></div>
+    <div id="wrongList" style="margin-top:10px"></div>
+  </div>
+</section>
+
+<!-- 报告 -->
+<section id="tab-report" class="hide">
+  <div class="card" id="reportBody"></div>
+</section>
+
+<!-- 设置 -->
+<section id="tab-set" class="hide">
+  <div class="card">
+    <h3>AI 通道</h3>
+    <div class="state">主通道 = 公司阿里百炼专属空间（果果的额度）；备用 = DeepSeek（阿里不通时自动切换，页面会标明用的哪家）。</div>
+    <div style="margin-top:8px">
+      <label style="font-size:13px;color:var(--sub)">主通道端点</label>
+      <input type="text" id="cfgAliUrl" style="margin:4px 0 8px">
+      <label style="font-size:13px;color:var(--sub)">主通道 Key</label>
+      <input type="text" id="cfgAliKey" style="margin:4px 0 8px">
+      <label style="font-size:13px;color:var(--sub)">文本模型 / 视觉模型</label>
+      <div class="row">
+        <input type="text" id="cfgAliTxt">
+        <input type="text" id="cfgAliVl">
+      </div>
+      <label style="font-size:13px;color:var(--sub);display:block;margin-top:8px">备用 DeepSeek Key</label>
+      <input type="text" id="cfgDsKey" style="margin:4px 0">
+      <div class="row"><button class="btn" onclick="saveCfg()">保存配置</button><button class="btn" onclick="testCfg()">测一下通不通</button></div>
+      <div id="cfgState" class="state"></div>
+    </div>
+  </div>
+  <div class="card">
+    <h3>数据备份</h3>
+    <div class="state">所有记录都存在这台手机的浏览器里，清缓存会丢。定期导出一份保险。</div>
+    <div class="row"><button class="btn" onclick="exportData()">导出备份</button><button class="btn" onclick="document.getElementById('impIn').click()">导入恢复</button></div>
+    <input type="file" id="impIn" accept=".json" class="hide">
+  </div>
+</section>
+
+</main>
+<div id="toast"></div>
+<script>
+"use strict";
+/* ---------- 基础数据 ---------- */
+const SUBJ={
+ math:{n:"数学",chaps:["有理数","有理数的运算","整式加减","一元一次方程","几何图形初步"]},
+ chin:{n:"语文",chaps:["春/济南的冬天","散文诗二首","从百草园到三味书屋","朝花夕拾名著导读","文言文《世说新语》二则"]},
+ eng:{n:"英语",chaps:["My classmates","Daily routines","My family","My school day","一般现在时"]},
+ pol:{n:"道法",chaps:["中学时代","认识自我","友谊与成长","师长情谊"]},
+ his:{n:"历史",chaps:["史前时期","夏商周","秦汉","三国两晋南北朝"]},
+ geo:{n:"地理",chaps:["地球与地图","陆地和海洋","天气与气候","居民与聚落"]},
+ bio:{n:"生物",chaps:["生物与环境","生物体的结构层次","绿色植物","人体的呼吸"]}};
+const SUBJ_NAME={};Object.keys(SUBJ).forEach(k=>SUBJ_NAME[k]=SUBJ[k].n);
+const TAGS=["概念不清","计算失误","审题错误","方法不会","粗心笔误"];
+const EBB=[1,2,4,7,15,30];
+const D=document;
+const S=load("gg2",{subj:"math",mode:true,hist:[],wrong:[],maps:[],cfg:null});
+function load(k,d){try{const v=localStorage.getItem(k);return v?Object.assign({},d,JSON.parse(v)):Object.assign({},d)}catch(e){return Object.assign({},d)}}
+function save(){try{localStorage.setItem("gg2",JSON.stringify(S))}catch(e){toast("存储失败："+e.message)}}
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
+function fmt(s){return esc(s).replace(/`([^`]+)`/g,"<b>$1</b>")}
+function toast(m){const t=D.getElementById("toast");t.textContent=m;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),2600)}
+function showTab(id){document.querySelectorAll("main section").forEach(s=>s.classList.add("hide"));D.getElementById(id).classList.remove("hide");document.querySelectorAll("#tabs button").forEach(b=>b.classList.toggle("on",b.dataset.t===id));if(id==="tab-wrong")renderWrong();if(id==="tab-report")renderReport();if(id==="tab-map")renderMapHist()}
+
+/* ---------- API 通道 ---------- */
+const DEF={aliUrl:"https://ws-3wgqxrgyi9wqh36.cn-beijing.maas.aliyuncs.com/compatible-mode/v1/chat/completions",aliKey:"",aliTxt:"cmaas-qwen3.8-flash",aliVl:"qwen3-vl-plus",dsKey:"sk-5bb206f385b34747bb847f892df48e3b",dsUrl:"https://api.deepseek.com/chat/completions",dsModel:"deepseek-chat"};
+function cfg(){return Object.assign({},DEF,S.cfg||{})}
+function fillCfg(){const c=cfg();D.getElementById("cfgAliUrl").value=c.aliUrl;D.getElementById("cfgAliKey").value=c.aliKey;D.getElementById("cfgAliTxt").value=c.aliTxt;D.getElementById("cfgAliVl").value=c.aliVl;D.getElementById("cfgDsKey").value=c.dsKey}
+function saveCfg(){S.cfg={aliUrl:D.getElementById("cfgAliUrl").value.trim(),aliKey:D.getElementById("cfgAliKey").value.trim(),aliTxt:D.getElementById("cfgAliTxt").value.trim(),aliVl:D.getElementById("cfgAliVl").value.trim(),dsKey:D.getElementById("cfgDsKey").value.trim()};save();toast("配置已保存")}
+async function api(url,key,body,tag){
+  const r=await fetch(url,{method:"POST",headers:{Authorization:"Bearer "+key,"Content-Type":"application/json"},body:JSON.stringify(body)});
+  if(!r.ok){const t=await r.text().catch(()=>"");let m=t;try{m=JSON.parse(t).error&&JSON.parse(t).error.message||t}catch(e){}
+    throw new Error(tag+" HTTP"+r.status+" "+String(m).slice(0,120))}
+  const j=await r.json();const msg=j.choices&&j.choices[0]&&j.choices[0].message;
+  if(msg&&typeof msg.content==="object"&&msg.content!==null)return {text:(msg.content.find(x=>x.type==="text")||{}).text||"",via:tag};
+  return {text:(msg&&msg.content||"").trim(),via:tag}
+}
+async function chat(messages,opts){
+  opts=opts||{};const c=cfg();const errs=[];
+  if(!opts.forceDs && c.aliKey){ // 先走主通道(阿里)，未配置Key直接跳过
+    try{
+      if(opts.vision){return await api(c.aliUrl,c.aliKey,{model:c.aliVl,messages,temperature:.3,max_tokens:opts.max||1500},"阿里"+c.aliVl)}
+      return await api(c.aliUrl,c.aliKey,{model:c.aliTxt,messages,temperature:opts.temp==null?.4:opts.temp,max_tokens:opts.max||1500},"阿里"+c.aliTxt);
+    }catch(e){errs.push(e.message);if(!/HTTP40[13]/.test(e.message))throw e}
+  }
+  if(opts.vision)throw new Error("视觉通道（阿里）不可用："+errs[0]+"。备用 DeepSeek 不支持看图，可先在下面把 AI 抄的题改对，再用文字讲。");
+  return await api(c.dsUrl,c.dsKey,{model:c.dsModel,messages,temperature:.4,max_tokens:opts.max||1500},"DeepSeek");
+}
+
+/* ---------- 学科选择 ---------- */
+function renderSubj(){
+  const box=D.getElementById("subjChips");box.innerHTML="";
+  Object.keys(SUBJ).forEach(k=>{const b=D.createElement("span");b.className="chip"+(S.subj===k?" on":"");b.textContent=SUBJ[k].n;b.onclick=()=>{S.subj=k;save();renderSubj()};box.appendChild(b)});
+  const cw=D.getElementById("chapWrap"),sel=D.getElementById("chapSel");
+  cw.classList.remove("hide");const cur=SUBJ[S.subj];
+  sel.innerHTML=cur.chaps.map(c=>'<option>'+esc(c)+'</option>').join("");
+  const mapBox=D.getElementById("mapChips");mapBox.innerHTML="";
+  Object.keys(SUBJ).forEach(k=>{const b=D.createElement("span");b.className="chip"+(S.subj===k?" on":"");b.textContent=SUBJ[k].n;b.onclick=()=>{S.subj=k;save();renderSubj()};mapBox.appendChild(b)});
+}
+function setMode(hint){S.mode=hint;save();D.getElementById("mHint").classList.toggle("on",hint);D.getElementById("mFull").classList.toggle("on",!hint)}
+
+/* ---------- 讲题核心 ---------- */
+const BASE_SYS="你是给13岁初一学生讲题的老师。铁律：全程简体中文；像家长讲题，不要书面腔；先易后难；OCR 或转述里如有错别字，按上下文猜含义再答，不要纠结；不确定的明说不确定。";
+function hintSys(){return BASE_SYS+"\n你现在处于【引导模式】：按四步讲——①这题在问什么(≤40字)②关键线索(≤60字)③解题思路2-3步(只讲怎么想，绝不许出现最终数值答案或最终结论)④易错点(≤30字)。禁止给出最终答案。"}
+function fullSys(){return BASE_SYS+"\n讲题要求：第一行直接给答案（用【答案】开头），然后分步骤讲为什么（步骤≤5步，每步≤40字），最后以「📌 记住这句：」开头给一句记住的话。"}
+let last=null; // 最近一次问答上下文
+async function ask(){
+  const q=D.getElementById("qBox").value.trim();
+  if(!q){toast("先输入问题哦");return}
+  const chap=D.getElementById("chapSel").value||"";
+  runAsk(q,chap,null);
+}
+async function runAsk(q,chap,ctx){
+  const st=D.getElementById("askState"),btn=D.getElementById("askBtn");
+  btn.disabled=true;st.className="state";st.textContent="AI 想题中…";
+  const msgs=[{role:"system",content:S.mode?hintSys():fullSys()},
+    {role:"user",content:(chap?("科目："+SUBJ[S.subj].n+"，章节："+chap+"。\n"):"")+"我的问题："+q}];
+  if(ctx)msgs.push({role:"user",content:ctx});
+  try{
+    const {text,via}=await chat(msgs,{max:1300});
+    st.textContent="";
+    last={q,chap,sys:S.mode?"hint":"full"};
+    renderAnswer(q,text,via,chap,false);
+  }catch(e){st.className="state err";st.textContent="出错了："+e.message+"（可在设置里检查通道）"}
+  btn.disabled=false;
+}
+function renderAnswer(q,text,via,chap,isImg){
+  const box=D.getElementById("askResult");
+  const card=D.createElement("div");card.className="card";
+  const meta='<span class="tag">'+esc(SUBJ[S.subj].n)+(chap?(" · "+esc(chap)):"")+'</span>'+(isImg?'<span class="tag">📷 拍题</span>':'');
+  card.innerHTML='<div class="qtext">'+esc(q)+'</div><div style="margin-bottom:8px">'+meta+'</div><div class="answer">'+fmt(text)+'</div>';
+  // 追问按钮组
+  const acts=D.createElement("div");acts.className="chips";acts.style.marginTop="10px";
+  [["再讲细一点","请把上面讲解中孩子最可能卡住的那一步，拆得更细地再讲一遍，仍"+(S.mode?"不要给出最终答案":"")],
+   ["换个方法","换一种和刚才不同的思路来讲这道题，"+(S.mode?"同样不要给出最终答案":"给出答案")],
+   ["出3道变式","围绕这道题的知识点出3道变式题（由易到难），答案与题目分开，放最后"],
+   ["📕 红笔批改(读心)","我是做题的学生。请按「读心模式」分析：结合这道题和我的讲解，猜猜我可能在哪一步、哪个概念上想岔了，用红笔批改的口吻（严厉但温和，不嘲笑但不回避）。"],
+   ["🎤 我讲给你听","现在换我当老师：我用自己的话讲一遍解题思路（我会打字发给你）。请你听完后给1-5分，指出讲对了什么、漏了什么，鼓励一下我。"]
+  ].forEach(([lab,prompt])=>{
+    const b=D.createElement("span");b.className="chip";b.textContent=lab;
+    b.onclick=()=>followUp(lab,prompt,card);acts.appendChild(b);
+  });
+  if(S.mode){const esc2=D.createElement("span");esc2.className="chip";esc2.style.background="#fff7ed";esc2.style.color="#c2410c";esc2.textContent="我看好啦，看完整讲解";
+    esc2.onclick=()=>{S.mode=false;setMode(false);last.sys="full";followUp("看完整讲解","好，我现在想完了。请给我这道题的完整讲解："+last.q,card)};acts.appendChild(esc2)}
+  card.appendChild(acts);
+  // 收藏错题按钮
+  const fav=D.createElement("div");fav.className="row";fav.style.marginTop="8px";
+  const fb=D.createElement("button");fb.className="btn sm";fb.textContent="＋ 收进错题本";
+  fb.onclick=()=>{addWrong({q,text:card.querySelector(".answer").textContent,tag:"",chap:chap||"",img:!!isImg});toast("已收进错题本")};
+  fav.appendChild(fb);card.appendChild(fav);
+  const viaEl=D.createElement("div");viaEl.className="via";viaEl.textContent="通道："+via;card.appendChild(viaEl);
+  box.insertBefore(card,box.firstChild);
+  S.hist.unshift({t:Date.now(),subj:S.subj,chap,q,text,via});if(S.hist.length>80)S.hist.pop();save();
+}
+async function followUp(lab,prompt,card){
+  const st=D.getElementById("askState");st.className="state";st.textContent="AI 处理中…";
+  const sys=last&&last.sys==="hint"?hintSys():fullSys();
+  const msgs=[{role:"system",content:sys},{role:"user",content:"原题："+(last?last.q:"")+"\n刚才的讲解："+(card.querySelector(".answer").textContent.slice(0,800))+"\n\n我的请求："+prompt}];
+  try{
+    const {text,via}=await chat(msgs,{max:1500});
+    st.textContent="";
+    renderAnswer("【"+lab+"】"+(last?last.q:""),text,via,last?last.chap:"",false);
+  }catch(e){st.className="state err";st.textContent="出错了："+e.message}
+}
+
+/* ---------- 拍题（双遍视觉） ---------- */
+function pickImage(src){
+  const fi=D.getElementById("fileIn");
+  fi.removeAttribute("capture");
+  if(src==="camera"){fi.setAttribute("capture","environment")}
+  fi.value="";fi.click();
+}
+D.getElementById("fileIn").addEventListener("change",async e=>{
+  const f=e.target.files[0];if(!f)return;
+  const dataUrl=await compress(f);
+  D.getElementById("previewBox").innerHTML='<img src="'+dataUrl+'" alt="题目照片">';
+  const st=D.getElementById("ocrState");st.className="state";st.textContent="AI 抄写员正在读题…";
+  D.getElementById("ocrBox").classList.add("hide");
+  try{
+    const p1=await chat([{role:"user",content:[
+      {type:"image_url",image_url:{url:dataUrl}},
+      {type:"text",text:"你是题目抄写员。把图里的题目一字不差抄成纯文本（保留数学式子和序号），只抄题不讲题不解题。图中若有多题，全部抄出并分行。认不清的字写□。"}]}],{vision:true,max:900});
+    st.textContent="抄好了，校对员正在逐字核对…";
+    let p2=p1.text;
+    try{
+      const v=await chat([{role:"user",content:[
+        {type:"image_url",image_url:{url:dataUrl}},
+        {type:"text",text:"下面是另一位抄写员抄的题目。请对照原图逐字校对，输出修正后的最终版本（只输出最终文本，不要解释）。仍认不清的字写□。\n--- 抄写稿 ---\n"+p1.text}]}],{vision:true,max:900});
+      p2=v.text;
+    }catch(e2){/* 校对失败就用第一遍 */}
+    st.textContent="";
+    D.getElementById("ocrText").value=p2;
+    D.getElementById("ocrBox").classList.remove("hide");
+  }catch(e){
+    st.className="state err";
+    st.textContent="识题出错了："+e.message;
+  }
+});
+function compress(file){return new Promise(res=>{
+  const img=new Image();const rd=new FileReader();
+  rd.onload=()=>img.src=rd.result;
+  img.onload=()=>{const M=1100;let w=img.width,h=img.height;if(w>M){h=h*M/w;w=M}
+    const cv=D.createElement("canvas");cv.width=w;cv.height=h;
+    cv.getContext("2d").drawImage(img,0,0,w,h);
+    res(cv.toDataURL("image/jpeg",.82))};
+  rd.readAsDataURL(file)})}
+function useOcr(full){
+  const q=D.getElementById("ocrText").value.trim();if(!q){toast("还没有抄题内容");return}
+  const chap=D.getElementById("chapSel").value||"";
+  S.mode=!full;setMode(!full);
+  showTab("tab-ask");
+  D.getElementById("qBox").value=q;
+  runAsk(q,chap,null);
+}
+
+/* ---------- 思维导图 ---------- */
+async function genMap(){
+  const topic=D.getElementById("mapTopic").value.trim()||D.getElementById("chapSel").value||SUBJ[S.subj].n;
+  const st=D.getElementById("mapState");st.className="state";st.textContent="AI 画结构中…";
+  const sys="你是初中老师的板书设计师。你不画图，只输出JSON。为一个初中生梳理知识块，输出格式：{\"title\":\"标题≤12字\",\"root\":{\"label\":\"中心≤8字\",\"children\":[{\"label\":\"分支≤10字\",\"children\":[{\"label\":\"叶子≤12字\"}]}]}}。要求：2-3层，每层2-4个，贴合初一教材，叶子要具体（公式/例子/易错点）。只输出JSON，不要其它文字。";
+  try{
+    const {text,via}=await chat([{role:"system",content:sys},{role:"user",content:"学科："+SUBJ[S.subj].n+"，知识块："+topic}],{temp:.3,max:1200});
+    const spec=parseJSON(text);
+    if(!spec||!spec.root)throw new Error("AI 返回的结构没法解析，再试一次");
+    renderMap(spec,via);
+    S.maps.unshift({t:Date.now(),subj:S.subj,topic,spec});if(S.maps.length>20)S.maps.pop();save();
+    st.textContent="";
+  }catch(e){st.className="state err";st.textContent="出错了："+e.message}
+}
+function parseJSON(t){
+  t=String(t).replace(/```json|```/g,"").trim();
+  const a=t.indexOf("{"),b=t.lastIndexOf("}");
+  if(a<0||b<0)return null;
+  try{return JSON.parse(t.slice(a,b+1))}catch(e){return null}
+}
+function renderMap(spec,via){
+  D.getElementById("mapCard").classList.remove("hide");
+  D.getElementById("mapTitle").textContent=spec.title||"知识导图";
+  D.getElementById("mapTree").innerHTML=treeHTML(spec.root,0);
+  D.getElementById("mapVia").textContent="通道："+(via||"");
+  function treeHTML(n,depth){
+    const kids=(n.children||[]).map(k=>'<div class="tnode'+(k.children&&k.children.length?"":" tleaf")+'">'+treeHTML(k,depth+1)+'</div>').join("");
+    return '<span class="tlabel">'+esc(n.label)+'</span>'+(kids?'<div style="margin-left:0">'+kids+'</div>':"");
+  }
+}
+function renderMapHist(){
+  const box=D.getElementById("mapHist");
+  if(!S.maps.length){box.innerHTML='<div class="state">还没有生成过导图</div>';return}
+  box.innerHTML=S.maps.map(m=>'<div class="wcard"><span class="tag">'+esc(SUBJ[m.subj]?SUBJ[m.subj].n:m.subj)+'</span> <b style="font-size:14px">'+esc(m.topic)+'</b> <button class="btn sm" onclick="showMap('+m.t+')">查看</button></div>').join("");
+}
+function showMap(t){const m=S.maps.find(x=>x.t===t);if(m){renderMap(m.spec);showTab("tab-map")}}
+
+/* ---------- 错题本 ---------- */
+function addWrong(w){
+  w.id=Date.now();w.t=Date.now();w.stage=0;w.due=Date.now()+EBB[0]*864e5;
+  S.wrong.unshift(w);if(S.wrong.length>200)S.wrong.pop();save();
+}
+let wFilter="";
+function renderWrong(){
+  const list=D.getElementById("wrongList"),fbox=D.getElementById("wFilter");
+  fbox.innerHTML='<span class="chip'+(!wFilter?" on":"")+'" onclick="wFilter=\'\';renderWrong()">全部</span>'+TAGS.map(t=>'<span class="chip'+(wFilter===t?" on":"")+'" onclick="wFilter=\''+t+'\';renderWrong()">'+t+'</span>').join("");
+  const now=Date.now();
+  const items=S.wrong.filter(w=>!wFilter||w.tag===wFilter);
+  const dueN=S.wrong.filter(w=>w.due<=now).length;
+  const badge=D.getElementById("dueBadge");badge.textContent=dueN?("今天该复习 "+dueN+" 条"):badge.textContent="";
+  if(!dueN)badge.classList.add("hide");else badge.classList.remove("hide");
+  if(!items.length){list.innerHTML='<div class="state">还没有错题。讲题页有「收进错题本」按钮。</div>';return}
+  list.innerHTML=items.map(w=>{
+    const due=w.due<=now?'<span class="due today">该复习了！</span>':'<span class="due">'+new Date(w.due).toLocaleDateString("zh-CN")+' 复习</span>';
+    return '<div class="wcard"><div class="qtext">'+esc(w.q.slice(0,140))+'</div>'+
+      (w.tag?'<span class="tag red">'+esc(w.tag)+'</span>':'')+
+      '<span class="tag">'+esc(SUBJ[w.subj]?SUBJ[w.subj].n:w.subj||"")+(w.chap?("·"+esc(w.chap)):"")+'</span> '+due+
+      '<details><summary>看讲解</summary><div class="answer">'+fmt(w.text)+'</div></details>'+
+      '<div class="row"><button class="btn sm" onclick="reviewWrong('+w.id+',1)">复习通过✓</button><button class="btn sm" onclick="reviewWrong('+w.id+',0)">又错了✗</button><button class="btn sm" onclick="delWrong('+w.id+')">删除</button></div></div>';
+  }).join("");
+}
+function reviewWrong(id,ok){
+  const w=S.wrong.find(x=>x.id===id);if(!w)return;
+  if(ok){w.stage=Math.min(w.stage+1,EBB.length-1);w.due=Date.now()+EBB[w.stage]*864e5;toast("记住了，"+EBB[w.stage]+"天后再来")}
+  else{w.stage=0;w.due=Date.now()+864e5;toast("回到明天再战")}
+  save();renderWrong();
+}
+function delWrong(id){S.wrong=S.wrong.filter(x=>x.id!==id);save();renderWrong()}
+
+/* ---------- 报告 ---------- */
+function renderReport(){
+  const now=Date.now(),week=now-7*864e5;
+  const h7=S.hist.filter(h=>h.t>=week),w7=S.wrong.filter(w=>w.t>=week);
+  const cnt={},tagCnt={};
+  h7.forEach(h=>cnt[h.subj]=(cnt[h.subj]||0)+1);
+  w7.concat(S.wrong.filter(w=>w.tag)).forEach(w=>{if(w.tag)tagCnt[w.tag]=(tagCnt[w.tag]||0)+1});
+  const max=Math.max(1,...Object.values(cnt));
+  const dueN=S.wrong.filter(w=>w.due<=now).length;
+  const topTag=Object.entries(tagCnt).sort((a,b)=>b[1]-a[1]).slice(0,3);
+  D.getElementById("reportBody").innerHTML=
+    '<h3>最近 7 天</h3>'+
+    '<div class="state">提问 '+h7.length+' 次 · 收错题 '+w7.length+' 条 · 待复习 <b>'+dueN+'</b> 条</div>'+
+    '<h3 style="margin-top:12px">各科提问</h3>'+
+    (Object.keys(cnt).length?Object.entries(cnt).map(([k,v])=>'<div style="margin:6px 0"><span class="tag">'+esc(SUBJ[k]?SUBJ[k].n:k)+'</span> '+v+' 次<div class="bar"><i style="width:'+(v/max*100)+'%"></i></div></div>').join(""):'<div class="state">这周还没提问</div>')+
+    (topTag.length?'<h3 style="margin-top:12px">最容易错的类型</h3>'+topTag.map(([t,v])=>'<span class="tag red">'+esc(t)+'×'+v+'</span>').join("")+"":'<div class="state">还没有错因标签（用「红笔批改」会自动打标签）</div>');
+}
+
+/* ---------- 备份 ---------- */
+function exportData(){
+  const blob=new Blob([JSON.stringify(S)],{type:"application/json"});
+  const a=D.createElement("a");a.href=URL.createObjectURL(blob);a.download="果果学习版_备份_"+new Date().toISOString().slice(0,10)+".json";a.click();
+}
+D.getElementById("impIn").addEventListener("change",e=>{
+  const f=e.target.files[0];if(!f)return;
+  const rd=new FileReader();
+  rd.onload=()=>{try{const d=JSON.parse(rd.result);Object.keys(d).forEach(k=>S[k]=d[k]);save();renderSubj();setMode(S.mode);toast("导入成功")}catch(err){toast("文件不对："+err.message)}};
+  rd.readAsText(f);
+});
+function testCfg(){
+  const st=D.getElementById("cfgState");st.className="state";st.textContent="测试中…";
+  chat([{role:"user",content:"回复ok"}],{max:8}).then(({via})=>{st.className="state";st.textContent="✅ 通了，用的是："+via;}).catch(e=>{st.className="state err";st.textContent="❌ "+e.message});
+}
+
+/* ---------- 启动 ---------- */
+renderSubj();setMode(S.mode);fillCfg();
+if(S.hist.length){const box=D.getElementById("askResult");S.hist.slice(0,5).forEach(h=>{
+  const card=D.createElement("div");card.className="card";
+  card.innerHTML='<div class="qtext">'+esc(h.q)+'</div><div style="margin-bottom:6px"><span class="tag">'+esc(SUBJ[h.subj]?SUBJ[h.subj].n:h.subj||"")+(h.chap?("·"+esc(h.chap)):"")+'</span></div><div class="answer">'+fmt(h.text)+'</div><div class="via">'+new Date(h.t).toLocaleString("zh-CN")+(h.via?(" · "+esc(h.via)):"")+'</div>';
+  box.appendChild(card)})}
+</script>
+</body>
+</html>
