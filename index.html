@@ -132,12 +132,12 @@ details{margin-top:6px}summary{cursor:pointer;color:var(--pri);font-size:13px}
   </div>
   <div class="card hide" id="mapCard">
     <h3 id="mapTitle"></h3>
-    <div class="state">内容看不全时 ← 左右滑动 →；点带 ▾ 的标签可折叠/展开分支</div>
+    <div class="row" style="margin:8px 0 4px"><button class="btn sm" id="mapZoomBtn" onclick="toggleZoom()">🔍 放大细看</button><span class="state" style="flex:1;margin:0">默认整图缩放看全貌；点带 ▾ 的标签可折叠/展开分支</span></div>
     <div class="treewrap"><div class="tree" id="mapTree"></div></div>
     <div class="via" id="mapVia"></div>
   </div>
   <div class="card">
-    <h3>导图历史</h3>
+    <div class="row" style="justify-content:space-between;align-items:center"><h3 style="margin:0">导图历史</h3><div><button class="btn sm" onclick="exportMaps()">📤 导出</button> <button class="btn sm" onclick="clearMaps()">🗑 清空</button></div></div>
     <div id="mapHist"></div>
   </div>
 </section>
@@ -402,19 +402,45 @@ function renderMap(spec,via){
   D.getElementById("mapTitle").textContent=spec.title||"知识导图";
   D.getElementById("mapTree").innerHTML=treeHTML(spec.root,0);
   D.getElementById("mapVia").textContent="通道："+(via||"");
+  mapFit=true;D.getElementById("mapZoomBtn").textContent="🔍 放大细看";
+  fitMap();
   function treeHTML(n,depth){
     const kids=(n.children||[]).map(k=>'<div class="tnode'+(k.children&&k.children.length?"":" tleaf")+'">'+treeHTML(k,depth+1)+'</div>').join("");
     if(kids)return '<span class="tlabel has-kids" onclick="tgNode(this)">'+esc(n.label)+'</span><div class="tkids">'+kids+'</div>';
     return '<span class="tlabel">'+esc(n.label)+'</span>';
   }
 }
-function tgNode(el){const d=el.nextElementSibling;if(d)d.classList.toggle("folded")}
+let mapFit=true;
+function fitMap(){
+  const wrap=D.querySelector("#mapCard .treewrap"),tree=D.getElementById("mapTree");
+  if(!wrap||!tree)return;
+  tree.style.transform="";wrap.style.height="";wrap.style.overflowX="auto";
+  if(!mapFit)return;
+  const w=tree.offsetWidth,cw=wrap.clientWidth;
+  if(w<=cw+2)return;
+  const k=Math.max(.42,cw/w);
+  tree.style.transform="scale("+k+")";
+  tree.style.transformOrigin="0 0";
+  wrap.style.height=(tree.offsetHeight*k+8)+"px";
+  if(w*k>cw+2)wrap.style.overflowX="auto";else wrap.style.overflowX="hidden";
+}
+function toggleZoom(){mapFit=!mapFit;D.getElementById("mapZoomBtn").textContent=mapFit?"🔍 放大细看":"📐 整图全貌";fitMap()}
+function tgNode(el){const d=el.nextElementSibling;if(d){d.classList.toggle("folded");fitMap()}}
 function renderMapHist(){
   const box=D.getElementById("mapHist");
   if(!S.maps.length){box.innerHTML='<div class="state">还没有生成过导图</div>';return}
-  box.innerHTML=S.maps.map(m=>'<div class="wcard"><span class="tag">'+esc(SUBJ[m.subj]?SUBJ[m.subj].n:m.subj)+'</span> <b style="font-size:14px">'+esc(m.topic)+'</b> <button class="btn sm" onclick="showMap('+m.t+')">查看</button></div>').join("");
+  box.innerHTML=S.maps.map(m=>'<div class="wcard"><span class="tag">'+esc(SUBJ[m.subj]?SUBJ[m.subj].n:m.subj)+'</span> <b style="font-size:14px">'+esc(m.topic)+'</b> <button class="btn sm" onclick="showMap('+m.t+')">查看</button> <button class="btn sm" onclick="delMap('+m.t+')">删除</button></div>').join("");
 }
 function showMap(t){const m=S.maps.find(x=>x.t===t);if(m){renderMap(m.spec);showTab("tab-map")}}
+function delMap(t){if(!confirm("删除这条导图？"))return;S.maps=S.maps.filter(x=>x.t!==t);save();renderMapHist()}
+function clearMaps(){if(!S.maps.length){alert("暂无导图历史");return}if(!confirm("清空全部 "+S.maps.length+" 条导图历史？（不影响讲题记录和错题本）"))return;S.maps=[];save();renderMapHist()}
+function exportMaps(){
+  if(!S.maps.length){alert("暂无导图可导出");return}
+  function outline(n,d){return "　".repeat(d)+(d?"· ":"")+n.label+"\n"+(n.children||[]).map(k=>outline(k,d+1)).join("")}
+  const txt="果果思维导图（导出于 "+new Date().toLocaleString("zh-CN")+"）\n\n"+S.maps.map(m=>"【"+(SUBJ[m.subj]?SUBJ[m.subj].n:m.subj)+" · "+m.topic+"】\n"+outline(m.spec.root,0)).join("\n\n");
+  const blob=new Blob([txt],{type:"text/plain;charset=utf-8"});
+  const a=D.createElement("a");a.href=URL.createObjectURL(blob);a.download="果果思维导图_"+new Date().toISOString().slice(0,10)+".txt";a.click();
+}
 
 /* ---------- 错题本 ---------- */
 function addWrong(w){
