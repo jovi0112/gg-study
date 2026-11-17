@@ -36,17 +36,7 @@ textarea{min-height:74px;resize:vertical}
 .qtext{font-size:14px;font-weight:600;margin-bottom:6px;white-space:pre-wrap}
 .hist{border-top:1px solid var(--line);padding-top:10px;margin-top:10px}
 .hist-q{font-size:13px;color:var(--sub);white-space:pre-wrap;word-break:break-word}
-/* 导图 */
-.treewrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
-.tree{width:max-content;min-width:100%;padding-right:16px}
-.tnode{border-left:2px solid var(--pri);margin-left:8px;padding-left:10px;position:relative}
-.tnode::before{content:"";position:absolute;left:-2px;top:0;width:10px;height:14px;border-bottom:2px solid var(--pri)}
-.tlabel{display:inline-block;background:var(--pri2);color:var(--pri);border-radius:8px;padding:4px 10px;font-size:13px;margin:4px 0;font-weight:500;white-space:nowrap}
-.tlabel.has-kids{cursor:pointer}
-.tlabel.has-kids::after{content:" ▾";opacity:.55;font-size:11px}
-.tkids.folded{display:none}
-.troot>.tlabel{background:var(--pri);color:#fff;font-weight:600;font-size:14px}
-.tleaf .tlabel{background:#fff;border:1px solid var(--line);color:var(--ink)}
+/* 导图 v5：布局/配色样式统一放 JS 的 MAP_CSS，页面与导出共用同一份 */
 /* 顶栏流量 */
 #qChip{font-size:12px;background:var(--pri2);color:var(--pri);border-radius:10px;padding:3px 8px;cursor:pointer;user-select:none;white-space:nowrap}
 /* 错题本 */
@@ -378,15 +368,97 @@ function useOcr(full){
 }
 
 /* ---------- 思维导图 ---------- */
+/* 调研依据（Xmind 结构库 / Thinking Maps 八大图示）：气泡放射图适合语言联想（语文/英语），
+   括号图适合整体-部分（生物），时间轴适合顺序事件（历史），树形图适合分类层级（数学/道法/地理） */
+const MAP_LAYOUT={math:"tree",chin:"bubble",eng:"bubble",pol:"tree",geo:"tree",bio:"brace",his:"flow"};
+const MAP_LNAME={tree:"树形图（分类层级）",bubble:"气泡放射图（联想发散）",brace:"括号图（整体-部分）",flow:"时间轴（先后顺序）"};
+const MAP_CSS=`
+.treewrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.mm{width:max-content;min-width:100%;padding-right:14px;--mc:#2563eb;--mcL:#dbeafe}
+.mm[data-s=chin]{--mc:#dc2626;--mcL:#fee2e2}
+.mm[data-s=eng]{--mc:#c2410c;--mcL:#ffedd5}
+.mm[data-s=pol]{--mc:#7c3aed;--mcL:#ede9fe}
+.mm[data-s=his]{--mc:#b45309;--mcL:#fef3c7}
+.mm[data-s=geo]{--mc:#0d9488;--mcL:#ccfbf1}
+.mm[data-s=bio]{--mc:#15803d;--mcL:#dcfce7}
+.mm .tnode{border-left:2px solid var(--bc,var(--mc));margin-left:8px;padding-left:10px;position:relative}
+.mm .tnode::before{content:"";position:absolute;left:-2px;top:0;width:10px;height:14px;border-bottom:2px solid var(--bc,var(--mc))}
+.mm .tlabel{display:inline-block;background:var(--bcL,var(--mcL));color:var(--bc,var(--mc));border-radius:8px;padding:4px 10px;font-size:13px;margin:4px 0;font-weight:500;white-space:nowrap}
+.mm .tlabel.has-kids{cursor:pointer}
+.mm .tlabel.has-kids::after{content:" \\25BE";opacity:.55;font-size:11px}
+.mm .tkids.folded{display:none}
+.mm .tleaf>.tlabel{background:#fff;border:1px solid var(--bc,var(--mc));color:#1f2937}
+.b0{--bc:#2563eb;--bcL:#dbeafe}.b1{--bc:#0d9488;--bcL:#ccfbf1}.b2{--bc:#d97706;--bcL:#fef3c7}.b3{--bc:#dc2626;--bcL:#fee2e2}.b4{--bc:#7c3aed;--bcL:#ede9fe}
+.mm-root{display:inline-block;background:var(--mc);color:#fff;border-radius:10px;padding:8px 14px;font-weight:600;margin:4px 0}
+.mm-bubble{display:flex;gap:8px;align-items:stretch}
+.mm-bubble .bub-side .tkids .tlabel{white-space:normal;display:block;max-width:180px;line-height:1.35}
+.bub-side{flex:1;display:flex;flex-direction:column;justify-content:center}
+.bub-root{background:var(--mc);color:#fff;border-radius:999px;padding:12px 14px;font-weight:600;align-self:center;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.12);font-size:15px}
+.mm-brace{display:flex;align-items:flex-start;gap:6px}
+.br-root{background:var(--mc);color:#fff;border-radius:12px;padding:10px 14px;font-weight:600;white-space:nowrap;align-self:center}
+.br-body{flex:1}
+.br-row{display:flex;align-items:stretch;gap:4px;padding:2px 0}
+.br-arm{width:14px;flex:none;border:2px solid var(--mc);border-left:none;border-radius:0 14px 14px 0;margin:4px 0;opacity:.75}
+.br-row.leaf .br-arm{width:9px;opacity:.4}
+.br-col{flex:1;min-width:0}
+.br-part{display:inline-block;font-weight:600;color:var(--mc);margin:4px 0;font-size:13.5px}
+.br-row.leaf .br-part{font-weight:400;color:#374151}
+.mm-flow{padding-left:2px}
+.fw-root{display:inline-block;background:var(--mc);color:#fff;border-radius:10px;padding:8px 16px;font-weight:600;margin-bottom:6px}
+.fw-item{position:relative;padding:0 0 10px 26px}
+.fw-item::before{content:"";position:absolute;left:8px;top:20px;bottom:0;width:2px;background:var(--mc);opacity:.3}
+.fw-item:last-child::before{display:none}
+.fw-dot{position:absolute;left:0;top:2px;width:18px;height:18px;border-radius:50%;background:var(--mc);color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center;font-weight:700}
+.fw-card{background:#fff;border:1px solid #e5e7eb;border-left:3px solid var(--mc);border-radius:10px;padding:8px 10px}
+.fw-card>b{color:var(--mc)}
+.fw-card ul{margin:4px 0 0;padding:0;list-style:none}
+.fw-card li{font-size:13px;color:#374151;padding:2px 0 2px 12px;position:relative}
+.fw-card li::before{content:"\\00B7";position:absolute;left:0;color:var(--mc);font-weight:700}
+`;
+(function(){const st=document.createElement("style");st.textContent=MAP_CSS;document.head.appendChild(st)})();
+function treeHTML(n,depth){
+  const kids=(n.children||[]).map(k=>'<div class="tnode'+(k.children&&k.children.length?"":" tleaf")+'">'+treeHTML(k,depth+1)+'</div>').join("");
+  if(depth===0)return '<span class="mm-root">'+esc(n.label)+'</span>'+(kids?'<div class="tkids" style="margin-left:0">'+kids+'</div>':"");
+  if(kids)return '<span class="tlabel has-kids" onclick="tgNode(this)">'+esc(n.label)+'</span><div class="tkids">'+kids+'</div>';
+  return '<span class="tlabel">'+esc(n.label)+'</span>';
+}
+function bubHTML(root){
+  const kids=root.children||[];
+  function branch(n,i){
+    const hasKids=n.children&&n.children.length;
+    const flat=hasKids?n.children.filter(k=>!(k.children&&k.children.length)).map(k=>'<span class="tlabel">'+esc(k.label)+'</span>').join(""):"";
+    const deep=hasKids?n.children.filter(k=>k.children&&k.children.length).map(k=>'<div class="tnode">'+treeHTML(k,2)+'</div>').join(""):"";
+    return '<div class="tnode b'+(i%5)+(hasKids?"":" tleaf")+'"><span class="tlabel'+(hasKids?" has-kids":"")+'" onclick="tgNode(this)">'+esc(n.label)+'</span>'+(flat?'<div class="tkids">'+flat+'</div>':"")+deep+'</div>';
+  }
+  const L=kids.filter((_,i)=>i%2===0).map((c,i)=>branch(c,i)).join("");
+  const R=kids.filter((_,i)=>i%2===1).map((c,i)=>branch(c,i)).join("");
+  return '<div class="mm-bubble"><div class="bub-side">'+L+'</div><div class="bub-root">'+esc(root.label)+'</div><div class="bub-side">'+R+'</div></div>';
+}
+function brHTML(root){
+  function brNode(n){
+    if(!n.children||!n.children.length)return '<div class="br-row leaf"><div class="br-arm"></div><div class="br-col"><span class="br-part">'+esc(n.label)+'</span></div></div>';
+    return '<div class="br-row"><div class="br-arm"></div><div class="br-col"><span class="br-part">'+esc(n.label)+'</span>'+n.children.map(brNode).join("")+'</div></div>';
+  }
+  return '<div class="mm-brace"><div class="br-root">'+esc(root.label)+'</div><div class="br-body">'+(root.children||[]).map(brNode).join("")+'</div></div>';
+}
+function fwHTML(root){
+  function li(n){
+    if(!n.children||!n.children.length)return '<li>'+esc(n.label)+'</li>';
+    return '<li><b>'+esc(n.label)+'</b></li>'+n.children.map(li).join("");
+  }
+  const items=(root.children||[]).map((c,i)=>'<div class="fw-item"><span class="fw-dot">'+(i+1)+'</span><div class="fw-card"><b>'+esc(c.label)+'</b>'+((c.children&&c.children.length)?'<ul>'+c.children.map(li).join("")+'</ul>':"")+'</div></div>').join("");
+  return '<div class="mm-flow"><span class="fw-root">'+esc(root.label)+'</span>'+items+'</div>';
+}
 async function genMap(){
   const topic=D.getElementById("mapTopic").value.trim()||D.getElementById("chapSel").value||SUBJ[S.subj].n;
   const st=D.getElementById("mapState");st.className="state";st.textContent="AI 画结构中…";
-  const sys="你是初中老师的板书设计师。你不画图，只输出JSON。为一个初中生梳理知识块，输出格式：{\"title\":\"标题≤12字\",\"root\":{\"label\":\"中心≤8字\",\"children\":[{\"label\":\"分支≤10字\",\"children\":[{\"label\":\"叶子≤12字\"}]}]}}。要求：2-3层，每层2-4个，贴合初一教材，叶子要具体（公式/例子/易错点）。只输出JSON，不要其它文字。";
+  const HINTS={chin:"组织方式：围绕中心发散联想（内容/写法/名句/考点）。",eng:"组织方式：围绕中心发散（定义/形式/例子/易错点）。",bio:"组织方式：按整体-部分关系组织（组成部分→更细部分）。",his:"组织方式：一级分支按时间先后顺序排列（事件/阶段），体现时间脉络。"};
+  const sys="你是初中老师的板书设计师。你不画图，只输出JSON。为一个初中生梳理知识块，输出格式：{\"title\":\"标题≤12字\",\"root\":{\"label\":\"中心≤8字\",\"children\":[{\"label\":\"分支≤10字\",\"children\":[{\"label\":\"叶子≤12字\"}]}]}}。要求：2-3层，每层2-4个，贴合初一教材，叶子要具体（公式/例子/易错点）。"+(HINTS[S.subj]||"组织方式：按分类层级组织（类目→子类→具体）。")+"只输出JSON，不要其它文字。";
   try{
     const {text,via}=await chat([{role:"system",content:sys},{role:"user",content:"学科："+SUBJ[S.subj].n+"，知识块："+topic}],{temp:.3,max:1200});
     const spec=parseJSON(text);
     if(!spec||!spec.root)throw new Error("AI 返回的结构没法解析，再试一次");
-    renderMap(spec,via);
+    renderMap(spec,via,S.subj);
     S.maps.unshift({t:Date.now(),subj:S.subj,topic,spec});if(S.maps.length>20)S.maps.pop();save();
     st.textContent="";
   }catch(e){st.className="state err";st.textContent="出错了："+e.message}
@@ -397,18 +469,16 @@ function parseJSON(t){
   if(a<0||b<0)return null;
   try{return JSON.parse(t.slice(a,b+1))}catch(e){return null}
 }
-function renderMap(spec,via){
+function renderMap(spec,via,subj){
   D.getElementById("mapCard").classList.remove("hide");
-  D.getElementById("mapTitle").textContent=spec.title||"知识导图";
-  D.getElementById("mapTree").innerHTML=treeHTML(spec.root,0);
-  D.getElementById("mapVia").textContent="通道："+(via||"");
+  D.getElementById("mapTitle").textContent=(spec.title||"知识导图");
+  const layout=(subj&&MAP_LAYOUT[subj])||"tree";
+  const tree=D.getElementById("mapTree");
+  tree.className="mm";tree.dataset.s=subj||"math";
+  tree.innerHTML=layout==="bubble"?bubHTML(spec.root):layout==="brace"?brHTML(spec.root):layout==="flow"?fwHTML(spec.root):treeHTML(spec.root,0);
+  D.getElementById("mapVia").textContent="样式："+MAP_LNAME[layout]+"｜通道："+(via||"—");
   mapFit=true;D.getElementById("mapZoomBtn").textContent="🔍 放大细看";
   fitMap();
-  function treeHTML(n,depth){
-    const kids=(n.children||[]).map(k=>'<div class="tnode'+(k.children&&k.children.length?"":" tleaf")+'">'+treeHTML(k,depth+1)+'</div>').join("");
-    if(kids)return '<span class="tlabel has-kids" onclick="tgNode(this)">'+esc(n.label)+'</span><div class="tkids">'+kids+'</div>';
-    return '<span class="tlabel">'+esc(n.label)+'</span>';
-  }
 }
 let mapFit=true;
 function fitMap(){
@@ -431,15 +501,52 @@ function renderMapHist(){
   if(!S.maps.length){box.innerHTML='<div class="state">还没有生成过导图</div>';return}
   box.innerHTML=S.maps.map(m=>'<div class="wcard"><span class="tag">'+esc(SUBJ[m.subj]?SUBJ[m.subj].n:m.subj)+'</span> <b style="font-size:14px">'+esc(m.topic)+'</b> <button class="btn sm" onclick="showMap('+m.t+')">查看</button> <button class="btn sm" onclick="delMap('+m.t+')">删除</button></div>').join("");
 }
-function showMap(t){const m=S.maps.find(x=>x.t===t);if(m){renderMap(m.spec);showTab("tab-map")}}
+function showMap(t){const m=S.maps.find(x=>x.t===t);if(m){renderMap(m.spec,"",m.subj);showTab("tab-map")}}
 function delMap(t){if(!confirm("删除这条导图？"))return;S.maps=S.maps.filter(x=>x.t!==t);save();renderMapHist()}
 function clearMaps(){if(!S.maps.length){alert("暂无导图历史");return}if(!confirm("清空全部 "+S.maps.length+" 条导图历史？（不影响讲题记录和错题本）"))return;S.maps=[];save();renderMapHist()}
 function exportMaps(){
   if(!S.maps.length){alert("暂无导图可导出");return}
-  function outline(n,d){return "　".repeat(d)+(d?"· ":"")+n.label+"\n"+(n.children||[]).map(k=>outline(k,d+1)).join("")}
-  const txt="果果思维导图（导出于 "+new Date().toLocaleString("zh-CN")+"）\n\n"+S.maps.map(m=>"【"+(SUBJ[m.subj]?SUBJ[m.subj].n:m.subj)+" · "+m.topic+"】\n"+outline(m.spec.root,0)).join("\n\n");
-  const blob=new Blob([txt],{type:"text/plain;charset=utf-8"});
-  const a=D.createElement("a");a.href=URL.createObjectURL(blob);a.download="果果思维导图_"+new Date().toISOString().slice(0,10)+".txt";a.click();
+  function expTree(n,depth){
+    const kids=(n.children||[]).map(k=>'<div class="tnode'+(k.children&&k.children.length?"":" tleaf")+'">'+expTree(k,depth+1)+'</div>').join("");
+    if(depth===0)return '<span class="mm-root">'+esc(n.label)+'</span>'+(kids?'<div class="tkids" style="margin-left:0">'+kids+'</div>':"");
+    if(kids)return '<span class="tlabel">'+esc(n.label)+'</span><div class="tkids">'+kids+'</div>';
+    return '<span class="tlabel">'+esc(n.label)+'</span>';
+  }
+  function expBub(root){
+    const kids=root.children||[];
+    function br(n,i){
+      const hasKids=n.children&&n.children.length;
+      const inner=hasKids?n.children.map(k=>'<span class="tlabel">'+esc(k.label)+'</span>').join(""):"";
+      return '<div class="tnode b'+(i%5)+(hasKids?"":" tleaf")+'"><span class="tlabel">'+esc(n.label)+'</span>'+(inner?'<div class="tkids">'+inner+'</div>':"")+'</div>';
+    }
+    const L=kids.filter((_,i)=>i%2===0).map(br).join(""),R=kids.filter((_,i)=>i%2===1).map(br).join("");
+    return '<div class="mm-bubble"><div class="bub-side">'+L+'</div><div class="bub-root">'+esc(root.label)+'</div><div class="bub-side">'+R+'</div></div>';
+  }
+  function expBr(root){
+    function brNode(n){
+      if(!n.children||!n.children.length)return '<div class="br-row leaf"><div class="br-arm"></div><div class="br-col"><span class="br-part">'+esc(n.label)+'</span></div></div>';
+      return '<div class="br-row"><div class="br-arm"></div><div class="br-col"><span class="br-part">'+esc(n.label)+'</span>'+n.children.map(brNode).join("")+'</div></div>';
+    }
+    return '<div class="mm-brace"><div class="br-root">'+esc(root.label)+'</div><div class="br-body">'+(root.children||[]).map(brNode).join("")+'</div></div>';
+  }
+  function expFw(root){
+    function li(n){
+      if(!n.children||!n.children.length)return '<li>'+esc(n.label)+'</li>';
+      return '<li><b>'+esc(n.label)+'</b></li>'+n.children.map(li).join("");
+    }
+    const items=(root.children||[]).map((c,i)=>'<div class="fw-item"><span class="fw-dot">'+(i+1)+'</span><div class="fw-card"><b>'+esc(c.label)+'</b>'+((c.children&&c.children.length)?'<ul>'+c.children.map(li).join("")+'</ul>':"")+'</div></div>').join("");
+    return '<div class="mm-flow"><span class="fw-root">'+esc(root.label)+'</span>'+items+'</div>';
+  }
+  const body=S.maps.map(m=>{
+    const layout=MAP_LAYOUT[m.subj]||"tree";
+    const inner=layout==="bubble"?expBub(m.spec.root):layout==="brace"?expBr(m.spec.root):layout==="flow"?expFw(m.spec.root):expTree(m.spec.root,0);
+    const lname=(MAP_LNAME[layout]||"").split("（")[0];
+    return '<section><h2><span class="sj">'+(SUBJ[m.subj]?SUBJ[m.subj].n:m.subj)+'</span>'+esc(m.topic)+'<small>'+lname+'</small></h2><div class="mm" data-s="'+m.subj+'">'+inner+'</div></section>';
+  }).join("");
+  const html='<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>果果思维导图 '+new Date().toISOString().slice(0,10)+'</title><style>'+MAP_CSS+'body{font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;max-width:820px;margin:0 auto;padding:18px;color:#111827}h1{font-size:20px;margin:6px 0}h2{font-size:16px;margin:22px 0 6px;border-left:4px solid #2563eb;padding-left:8px}h2 .sj{display:inline-block;background:#2563eb;color:#fff;border-radius:6px;font-size:12px;padding:2px 8px;margin-right:8px;vertical-align:2px}h2 small{color:#6b7280;font-weight:400;font-size:12px;margin-left:8px}.mm{margin:8px 0 4px}section{break-inside:avoid}hr{border:none;border-top:1px dashed #d1d5db;margin:18px 0}@media print{h2{break-after:avoid}}</style></head><body><h1>🧠 果果思维导图</h1><p style="color:#6b7280;font-size:13px">导出于 '+new Date().toLocaleString("zh-CN")+' · 共 '+S.maps.length+' 张（分科样式：语文/英语气泡图 · 生物括号图 · 历史时间轴 · 其它树形图）</p>'+body+'</body></html>';
+  const blob=new Blob([html],{type:"text/html;charset=utf-8"});
+  const a=D.createElement("a");a.href=URL.createObjectURL(blob);a.download="果果思维导图_"+new Date().toISOString().slice(0,10)+".html";a.click();
+  toast("已导出 "+S.maps.length+" 张图形导图（HTML，可打印）");
 }
 
 /* ---------- 错题本 ---------- */
