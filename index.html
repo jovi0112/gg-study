@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>果果学习版 v7.3</title>
+<title>果果学习版 v7.4</title>
 <style>
 :root{--bg:#f4f6fa;--card:#fff;--ink:#1c2333;--sub:#66708a;--pri:#3b6ef5;--pri2:#eef3ff;--ok:#1a9e5c;--warn:#c2410c;--line:#e3e8f2;--red:#d64545}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -63,7 +63,7 @@ details{margin-top:6px}summary{cursor:pointer;color:var(--pri);font-size:13px}
 </style>
 </head>
 <body>
-<header><b>果果学习版 <i>v7.3</i></b><span style="display:flex;gap:8px;align-items:center"><span id="qChip" onclick="quotaInfo()" title="累计AI流量">⚡…</span><button class="btn sm" onclick="showTab('tab-set')">⚙ 设置</button></span></header>
+<header><b>果果学习版 <i>v7.4</i></b><span style="display:flex;gap:8px;align-items:center"><span id="qChip" onclick="quotaInfo()" title="累计AI流量">⚡…</span><button class="btn sm" onclick="showTab('tab-set')">⚙ 设置</button></span></header>
 <nav id="tabs">
   <button class="on" data-t="tab-ask" onclick="showTab('tab-ask')">💬 讲题</button>
   <button data-t="tab-photo" onclick="showTab('tab-photo')">📷 拍题</button>
@@ -134,7 +134,7 @@ details{margin-top:6px}summary{cursor:pointer;color:var(--pri);font-size:13px}
   </div>
   <div class="card hide" id="mapCard">
     <h3 id="mapTitle"></h3>
-    <div class="row" style="margin:8px 0 4px"><button class="btn sm" id="mapZoomBtn" onclick="toggleZoom()">🔍 放大细看</button><span class="state" style="flex:1;margin:0">默认整图缩放看全貌；点带 ▾ 的标签可折叠/展开分支</span></div>
+    <div class="row" style="margin:8px 0 4px"><button class="btn sm" id="mapZoomBtn" onclick="toggleZoom()">🔍 放大细看</button><button class="btn sm pri" onclick="saveCurPNG()">📥 存为图片</button><span class="state" style="flex:1;margin:0">默认整图缩放看全貌；点带 ▾ 的标签可折叠/展开分支</span></div>
     <div class="treewrap"><div class="tree" id="mapTree"></div></div>
     <div class="via" id="mapVia"></div>
   </div>
@@ -636,22 +636,66 @@ function renderMap(spec,via,subj){
   tree.className="mm";tree.dataset.s=subj||"math";
   tree.innerHTML=layout==="bubble"?bubHTML(spec.root):layout==="brace"?brHTML(spec.root):layout==="flow"?fwHTML(spec.root):treeHTML(spec.root,0);
   D.getElementById("mapVia").textContent="样式："+MAP_LNAME[layout]+"｜通道："+(via||"—");
+  curMap={spec:spec,subj:subj||"math",topic:spec.title||"导图"};
   mapFit=true;D.getElementById("mapZoomBtn").textContent="🔍 放大细看";
   fitMap();
+}
+let curMap=null;
+/* ---------- 导图导出为 PNG 图片（foreignObject 合成，无需联网库） ---------- */
+function mapPNG(spec,subj){
+  const layout=(subj&&MAP_LAYOUT[subj])||"tree";
+  const inner=layout==="bubble"?bubHTML(spec.root):layout==="brace"?brHTML(spec.root):layout==="flow"?fwHTML(spec.root):treeHTML(spec.root,0);
+  const holder=D.createElement("div");
+  holder.style.cssText="position:fixed;left:-99999px;top:0;visibility:hidden";
+  holder.innerHTML='<div class="mm" data-s="'+(subj||"math")+'" style="font-family:system-ui,-apple-system,\'PingFang SC\',\'Microsoft YaHei\',sans-serif;background:#fff;padding:16px;border-radius:12px">'+inner+'</div>';
+  D.body.appendChild(holder);
+  const el=holder.querySelector(".mm");
+  const w=el.offsetWidth,h=el.offsetHeight,outer=el.outerHTML;
+  holder.remove();
+  if(!w||!h)return Promise.reject(new Error("导图为空"));
+  const S2=(w*h>1.6e6)?1:2; // 图太大降为1x，防手机 canvas 尺寸上限
+  const xhtml='<div xmlns="http://www.w3.org/1999/xhtml" style="width:'+w+'px"><style>'+MAP_CSS+'</style>'+outer+'</div>';
+  const svg='<svg xmlns="http://www.w3.org/2000/svg" width="'+(w*S2)+'" height="'+(h*S2)+'" viewBox="0 0 '+w+' '+h+'"><foreignObject width="'+w+'" height="'+h+'">'+xhtml+'</foreignObject></svg>';
+  return new Promise((res,rej)=>{
+    const img=new Image();
+    img.onload=()=>{const cv=D.createElement("canvas");cv.width=w*S2;cv.height=h*S2;
+      const g=cv.getContext("2d");g.fillStyle="#fff";g.fillRect(0,0,cv.width,cv.height);
+      g.drawImage(img,0,0,cv.width,cv.height);res(cv)};
+    img.onerror=()=>rej(new Error("图片合成失败（浏览器限制）"));
+    img.src="data:image/svg+xml;charset=utf-8,"+encodeURIComponent(svg);
+  });
+}
+function dlCanvas(cv,fname){
+  return new Promise((res,rej)=>cv.toBlob(b=>{
+    if(!b){rej(new Error("生成图片失败"));return}
+    const a=D.createElement("a");a.href=URL.createObjectURL(b);a.download=fname;a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href),4000);res(true);
+  },"image/png"));
+}
+function safeFName(s){return String(s).replace(/[\\/:*?"<>|#&]/g,"_").slice(0,40)}
+async function saveCurPNG(){
+  if(!curMap){toast("先生成一张导图");return}
+  toast("正在合成图片…");
+  try{
+    const cv=await mapPNG(curMap.spec,curMap.subj);
+    await dlCanvas(cv,"果果导图_"+safeFName(curMap.topic)+"_"+new Date().toISOString().slice(0,10)+".png");
+    toast("已保存 PNG 图片（可在相册/下载里看）");
+  }catch(e){toast("导出失败："+e.message)}
 }
 let mapFit=true;
 function fitMap(){
   const wrap=D.querySelector("#mapCard .treewrap"),tree=D.getElementById("mapTree");
   if(!wrap||!tree)return;
-  tree.style.transform="";wrap.style.height="";wrap.style.overflowX="auto";
+  tree.style.transform="";wrap.style.height="";wrap.style.overflowX="auto";wrap.style.maxHeight="";
   if(!mapFit)return;
-  const w=tree.offsetWidth,cw=wrap.clientWidth;
-  if(w<=cw+2)return;
-  const k=Math.max(.42,cw/w);
+  const w=tree.offsetWidth,h=tree.offsetHeight,cw=wrap.clientWidth;
+  if(w<=cw+2&&h<=window.innerHeight*0.66)return; // 宽高都放得下，不动
+  const ch=Math.max(240,Math.round(window.innerHeight*0.66));
+  const k=Math.max(Math.min(cw/w,ch/h),.22); // 宽高取更严的那个，全图塞进一屏
   tree.style.transform="scale("+k+")";
   tree.style.transformOrigin="0 0";
-  wrap.style.height=(tree.offsetHeight*k+8)+"px";
-  if(w*k>cw+2)wrap.style.overflowX="auto";else wrap.style.overflowX="hidden";
+  wrap.style.height=(h*k+8)+"px";
+  wrap.style.overflowX=(w*k>cw+2)?"auto":"hidden";
 }
 function toggleZoom(){mapFit=!mapFit;D.getElementById("mapZoomBtn").textContent=mapFit?"🔍 放大细看":"📐 整图全貌";fitMap()}
 function tgNode(el){const d=el.nextElementSibling;if(d){d.classList.toggle("folded");fitMap()}}
@@ -663,49 +707,20 @@ function renderMapHist(){
 function showMap(t){const m=S.maps.find(x=>x.t===t);if(m){renderMap(m.spec,"",m.subj);showTab("tab-map")}}
 function delMap(t){if(!confirm("删除这条导图？"))return;S.maps=S.maps.filter(x=>x.t!==t);save();renderMapHist()}
 function clearMaps(){if(!S.maps.length){alert("暂无导图历史");return}if(!confirm("清空全部 "+S.maps.length+" 条导图历史？（不影响讲题记录和错题本）"))return;S.maps=[];save();renderMapHist()}
-function exportMaps(){
+async function exportMaps(){
   if(!S.maps.length){alert("暂无导图可导出");return}
-  function expTree(n,depth){
-    const kids=(n.children||[]).map(k=>'<div class="tnode'+(k.children&&k.children.length?"":" tleaf")+'">'+expTree(k,depth+1)+'</div>').join("");
-    if(depth===0)return '<span class="mm-root">'+esc(n.label)+'</span>'+(kids?'<div class="tkids" style="margin-left:0">'+kids+'</div>':"");
-    if(kids)return '<span class="tlabel">'+esc(n.label)+'</span><div class="tkids">'+kids+'</div>';
-    return '<span class="tlabel">'+esc(n.label)+'</span>';
+  toast("正在逐张生成 PNG 图片…（共 "+S.maps.length+" 张）");
+  let okn=0;
+  for(let i=0;i<S.maps.length;i++){
+    const m=S.maps[i];
+    try{
+      const cv=await mapPNG(m.spec,m.subj);
+      await dlCanvas(cv,"果果导图_"+safeFName((SUBJ[m.subj]?SUBJ[m.subj].n:m.subj))+"_"+safeFName(m.topic)+"_"+(i+1)+".png");
+      okn++;
+    }catch(e){/* 单张失败不中断 */}
+    await new Promise(r=>setTimeout(r,450)); // 间隔下载，防浏览器拦截
   }
-  function expBub(root){
-    const kids=root.children||[];
-    function br(n,i){
-      const hasKids=n.children&&n.children.length;
-      const inner=hasKids?n.children.map(k=>'<span class="tlabel">'+esc(k.label)+'</span>').join(""):"";
-      return '<div class="tnode b'+(i%5)+(hasKids?"":" tleaf")+'"><span class="tlabel">'+esc(n.label)+'</span>'+(inner?'<div class="tkids">'+inner+'</div>':"")+'</div>';
-    }
-    const L=kids.filter((_,i)=>i%2===0).map(br).join(""),R=kids.filter((_,i)=>i%2===1).map(br).join("");
-    return '<div class="mm-bubble"><div class="bub-side">'+L+'</div><div class="bub-root">'+esc(root.label)+'</div><div class="bub-side">'+R+'</div></div>';
-  }
-  function expBr(root){
-    function brNode(n){
-      if(!n.children||!n.children.length)return '<div class="br-row leaf"><div class="br-arm"></div><div class="br-col"><span class="br-part">'+esc(n.label)+'</span></div></div>';
-      return '<div class="br-row"><div class="br-arm"></div><div class="br-col"><span class="br-part">'+esc(n.label)+'</span>'+n.children.map(brNode).join("")+'</div></div>';
-    }
-    return '<div class="mm-brace"><div class="br-root">'+esc(root.label)+'</div><div class="br-body">'+(root.children||[]).map(brNode).join("")+'</div></div>';
-  }
-  function expFw(root){
-    function li(n){
-      if(!n.children||!n.children.length)return '<li>'+esc(n.label)+'</li>';
-      return '<li><b>'+esc(n.label)+'</b></li>'+n.children.map(li).join("");
-    }
-    const items=(root.children||[]).map((c,i)=>'<div class="fw-item"><span class="fw-dot">'+(i+1)+'</span><div class="fw-card"><b>'+esc(c.label)+'</b>'+((c.children&&c.children.length)?'<ul>'+c.children.map(li).join("")+'</ul>':"")+'</div></div>').join("");
-    return '<div class="mm-flow"><span class="fw-root">'+esc(root.label)+'</span>'+items+'</div>';
-  }
-  const body=S.maps.map(m=>{
-    const layout=MAP_LAYOUT[m.subj]||"tree";
-    const inner=layout==="bubble"?expBub(m.spec.root):layout==="brace"?expBr(m.spec.root):layout==="flow"?expFw(m.spec.root):expTree(m.spec.root,0);
-    const lname=(MAP_LNAME[layout]||"").split("（")[0];
-    return '<section><h2><span class="sj">'+(SUBJ[m.subj]?SUBJ[m.subj].n:m.subj)+'</span>'+esc(m.topic)+'<small>'+lname+'</small></h2><div class="mm" data-s="'+m.subj+'">'+inner+'</div></section>';
-  }).join("");
-  const html='<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>果果思维导图 '+new Date().toISOString().slice(0,10)+'</title><style>'+MAP_CSS+'body{font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;max-width:820px;margin:0 auto;padding:18px;color:#111827}h1{font-size:20px;margin:6px 0}h2{font-size:16px;margin:22px 0 6px;border-left:4px solid #2563eb;padding-left:8px}h2 .sj{display:inline-block;background:#2563eb;color:#fff;border-radius:6px;font-size:12px;padding:2px 8px;margin-right:8px;vertical-align:2px}h2 small{color:#6b7280;font-weight:400;font-size:12px;margin-left:8px}.mm{margin:8px 0 4px}section{break-inside:avoid}hr{border:none;border-top:1px dashed #d1d5db;margin:18px 0}@media print{h2{break-after:avoid}}</style></head><body><h1>🧠 果果思维导图</h1><p style="color:#6b7280;font-size:13px">导出于 '+new Date().toLocaleString("zh-CN")+' · 共 '+S.maps.length+' 张（分科样式：语文/英语气泡图 · 生物括号图 · 历史时间轴 · 其它树形图）</p>'+body+'</body></html>';
-  const blob=new Blob([html],{type:"text/html;charset=utf-8"});
-  const a=D.createElement("a");a.href=URL.createObjectURL(blob);a.download="果果思维导图_"+new Date().toISOString().slice(0,10)+".html";a.click();
-  toast("已导出 "+S.maps.length+" 张图形导图（HTML，可打印）");
+  toast(okn?("已导出 "+okn+" 张 PNG 图片（下载/相册里看）"):"导出失败，请重试");
 }
 
 /* ---------- 错题本 ---------- */
