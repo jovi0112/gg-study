@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>果果学习版 v7.2</title>
+<title>果果学习版 v7.3</title>
 <style>
 :root{--bg:#f4f6fa;--card:#fff;--ink:#1c2333;--sub:#66708a;--pri:#3b6ef5;--pri2:#eef3ff;--ok:#1a9e5c;--warn:#c2410c;--line:#e3e8f2;--red:#d64545}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -63,12 +63,12 @@ details{margin-top:6px}summary{cursor:pointer;color:var(--pri);font-size:13px}
 </style>
 </head>
 <body>
-<header><b>果果学习版 <i>v7.2</i></b><span style="display:flex;gap:8px;align-items:center"><span id="qChip" onclick="quotaInfo()" title="累计AI流量">⚡…</span><button class="btn sm" onclick="showTab('tab-set')">⚙ 设置</button></span></header>
+<header><b>果果学习版 <i>v7.3</i></b><span style="display:flex;gap:8px;align-items:center"><span id="qChip" onclick="quotaInfo()" title="累计AI流量">⚡…</span><button class="btn sm" onclick="showTab('tab-set')">⚙ 设置</button></span></header>
 <nav id="tabs">
   <button class="on" data-t="tab-ask" onclick="showTab('tab-ask')">💬 讲题</button>
   <button data-t="tab-photo" onclick="showTab('tab-photo')">📷 拍题</button>
   <button data-t="tab-map" onclick="showTab('tab-map')">🧠 导图</button>
-  <button data-t="tab-wrong" onclick="showTab('tab-wrong')">📕 错题本</button>
+  <button data-t="tab-wrong" onclick="showTab('tab-wrong')">📕 错题本<span id="tabDue" class="tag red hide" style="margin-left:4px"></span></button>
   <button data-t="tab-report" onclick="showTab('tab-report')">📊 报告</button>
 </nav>
 <main>
@@ -106,6 +106,11 @@ details{margin-top:6px}summary{cursor:pointer;color:var(--pri);font-size:13px}
     </div>
     <input type="file" id="fileIn" accept="image/*" class="hide">
     <div id="previewBox"></div>
+    <button class="btn sm hide" id="cropBtn" onclick="startCrop()" style="margin-top:6px">✂️ 框选其中一题（二次截图）</button>
+    <div id="cropBar" class="row hide" style="margin-top:6px">
+      <button class="btn pri sm" onclick="doCrop()">✂️ 只抄框里的题</button>
+      <button class="btn sm" onclick="cancelCrop()">重选</button>
+    </div>
     <div id="ocrState" class="state"></div>
     <div id="ocrBox" class="hide">
       <h3 style="margin-top:8px">AI 抄的题（可改）</h3>
@@ -143,6 +148,7 @@ details{margin-top:6px}summary{cursor:pointer;color:var(--pri);font-size:13px}
 <section id="tab-wrong" class="hide">
   <div class="card">
     <h3>错题本 <span id="dueBadge" class="tag red"></span></h3>
+    <div id="planCard" style="margin-bottom:8px"></div>
     <div class="chips" id="wFilter"></div>
     <div id="wrongList" style="margin-top:10px"></div>
   </div>
@@ -383,8 +389,14 @@ function gsSend(G){
 }
 function gsWin(G){
   gsChip(G,"出3道变式","（孩子已经自己做出这道题了。请围绕它的知识点出3道难度贴合"+S.stage+S.grade+"教材的变式题，由易到难，答案与题目分开、放在最后。）");
+  if(G.reviewId){ // 这是复盘重做：通关即自动顺延复盘期
+    const w=S.wrong.find(x=>x.id===G.reviewId);
+    if(w){w.stage=Math.min(w.stage+1,EBB.length-1);w.due=Date.now()+EBB[w.stage]*864e5;save();updateDueBadge();toast("复盘完成！"+EBB[w.stage]+"天后再来")}
+    const done=D.createElement("span");done.className="chip";done.style.background="#ecfdf5";done.style.color="#047857";done.textContent="✅ 复盘已记";done.onclick=()=>showTab("tab-wrong");
+    G.acts.insertBefore(done,G.acts.lastChild);
+  }
   const fav=D.createElement("span");fav.className="chip";fav.style.background="#fff7ed";fav.style.color="#c2410c";fav.textContent="＋ 收进错题本";
-  fav.onclick=()=>{const talk=G.msgs.filter(m=>m.role==="assistant").slice(0,3).map(m=>m.content).join("\n");addWrong({q:G.q,text:talk.slice(0,1000),tag:"",chap:G.chap||""});toast("已收进错题本")};
+  fav.onclick=()=>{const talk=G.msgs.filter(m=>m.role==="assistant").slice(0,3).map(m=>m.content).join("\n");addWrong({q:G.q,text:talk.slice(0,1000),tag:"",chap:G.chap||""});toast("已收进错题本，明天复盘")};
   G.acts.insertBefore(fav,G.acts.lastChild);
   G.inWrap.classList.add("hide");
   G.st.className="state";G.st.textContent="🎉 自己做出来了！想再练就点「出3道变式」，或重新问一题。";
@@ -417,10 +429,19 @@ function pickImage(src){
   if(src==="camera"){fi.setAttribute("capture","environment")}
   fi.value="";fi.click();
 }
+let PHOTO=null; // 当前照片 dataUrl（平台内二次截图用）
 D.getElementById("fileIn").addEventListener("change",async e=>{
   const f=e.target.files[0];if(!f)return;
-  const dataUrl=await compress(f);
-  D.getElementById("previewBox").innerHTML='<img src="'+dataUrl+'" alt="题目照片">';
+  PHOTO=await compress(f);
+  showPhoto(PHOTO);
+});
+function showPhoto(url){
+  D.getElementById("previewBox").innerHTML='<img id="photoImg" src="'+url+'" alt="题目照片">';
+  D.getElementById("cropBtn").classList.remove("hide");
+  cancelCrop();
+  ocrRun(url);
+}
+async function ocrRun(dataUrl){
   const st=D.getElementById("ocrState");st.className="state";st.textContent="AI 抄写员正在读题…";
   D.getElementById("ocrBox").classList.add("hide");
   try{
@@ -442,7 +463,53 @@ D.getElementById("fileIn").addEventListener("change",async e=>{
     st.className="state err";
     st.textContent="识题出错了："+e.message;
   }
-});
+}
+/* ---------- 平台内二次截图（框选一题再抄） ---------- */
+let cropS=null; // 框选矩形（相对显示尺寸的坐标）
+function startCrop(){
+  const img=D.getElementById("photoImg");if(!img){toast("先拍一张或选一张图");return}
+  cancelCrop();
+  const wrap=D.createElement("div");wrap.id="cropWrap";
+  wrap.style.cssText="position:relative;display:block;max-width:100%;touch-action:none;user-select:none;-webkit-user-select:none";
+  img.parentNode.insertBefore(wrap,img);wrap.appendChild(img);
+  img.style.cssText="display:block;max-width:100%;border-radius:8px";
+  const ov=D.createElement("div");ov.id="cropOv";
+  ov.style.cssText="position:absolute;left:0;top:0;width:100%;height:100%;cursor:crosshair;background:rgba(0,0,0,.22)";
+  const rect=D.createElement("div");rect.id="cropRect";
+  rect.style.cssText="position:absolute;display:none;border:2px solid #2563eb;background:rgba(37,99,235,.14);box-shadow:0 0 0 9999px rgba(0,0,0,.35)";
+  ov.appendChild(rect);wrap.appendChild(ov);
+  let drag=false;
+  const pos=e=>{const r=ov.getBoundingClientRect();const t=e.touches?e.touches[0]:e;return{x:Math.max(0,Math.min(r.width,t.clientX-r.left)),y:Math.max(0,Math.min(r.height,t.clientY-r.top))}};
+  const draw=()=>{if(!cropS)return;rect.style.display="block";
+    rect.style.left=Math.min(cropS.x0,cropS.x1)+"px";rect.style.top=Math.min(cropS.y0,cropS.y1)+"px";
+    rect.style.width=Math.abs(cropS.x1-cropS.x0)+"px";rect.style.height=Math.abs(cropS.y1-cropS.y0)+"px"};
+  ov.addEventListener("pointerdown",e=>{e.preventDefault();drag=true;const p=pos(e);cropS={x0:p.x,y0:p.y,x1:p.x,y1:p.y};try{ov.setPointerCapture(e.pointerId)}catch(_){}});
+  ov.addEventListener("pointermove",e=>{if(!drag)return;const p=pos(e);cropS.x1=p.x;cropS.y1=p.y;draw()});
+  ov.addEventListener("pointerup",e=>{drag=false;if(cropS){const p=pos(e);cropS.x1=p.x;cropS.y1=p.y;draw()}});
+  ov.addEventListener("pointercancel",()=>{drag=false});
+  D.getElementById("cropBar").classList.remove("hide");
+  toast("在照片上拖出一道题的范围");
+}
+function doCrop(){
+  const img=D.getElementById("photoImg");
+  if(!img||!cropS||Math.abs(cropS.x1-cropS.x0)<12||Math.abs(cropS.y1-cropS.y0)<12){toast("先在照片上框出一道题");return}
+  const dw=img.clientWidth,dh=img.clientHeight;
+  if(!dw||!img.naturalWidth){toast("照片还没加载好，再试一次");return}
+  const sx=img.naturalWidth/dw,sy=img.naturalHeight/dh;
+  const x=Math.min(cropS.x0,cropS.x1)*sx,y=Math.min(cropS.y0,cropS.y1)*sy;
+  const w=Math.abs(cropS.x1-cropS.x0)*sx,h=Math.abs(cropS.y1-cropS.y0)*sy;
+  const cv=D.createElement("canvas");cv.width=Math.round(w);cv.height=Math.round(h);
+  cv.getContext("2d").drawImage(img,Math.round(x),Math.round(y),Math.round(w),Math.round(h));
+  const url=cv.toDataURL("image/jpeg",.9);
+  PHOTO=url;showPhoto(url);cropS=null;
+  toast("已裁出框里的题，正在重新抄题");
+}
+function cancelCrop(){
+  const wrap=D.getElementById("cropWrap");
+  if(wrap){const img=D.getElementById("photoImg");if(img)wrap.parentNode.insertBefore(img,wrap);wrap.remove()}
+  cropS=null;
+  const bar=D.getElementById("cropBar");if(bar)bar.classList.add("hide");
+};
 function compress(file){return new Promise(res=>{
   const img=new Image();const rd=new FileReader();
   rd.onload=()=>img.src=rd.result;
@@ -653,16 +720,25 @@ function renderWrong(){
   const now=Date.now();
   const items=S.wrong.filter(w=>!wFilter||w.tag===wFilter);
   const dueN=S.wrong.filter(w=>w.due<=now).length;
-  const badge=D.getElementById("dueBadge");badge.textContent=dueN?("今天该复习 "+dueN+" 条"):badge.textContent="";
+  const badge=D.getElementById("dueBadge");badge.textContent=dueN?("今天该复盘 "+dueN+" 条"):badge.textContent="";
   if(!dueN)badge.classList.add("hide");else badge.classList.remove("hide");
+  updateDueBadge();
+  // 复盘计划卡
+  const plan=D.getElementById("planCard");
+  const dueItems=S.wrong.filter(w=>w.due<=now).sort((a,b)=>a.due-b.due);
+  const inDays=(lo,hi)=>S.wrong.filter(w=>{const d=(w.due-now)/864e5;return d>lo&&d<=hi}).length;
+  const d1=inDays(0,1),d2=inDays(1,2),d7=inDays(2,7),d30=S.wrong.filter(w=>(w.due-now)/864e5>7).length;
+  plan.innerHTML='<div class="wcard" style="background:#fffbeb;border-color:#fde68a"><b>📅 复盘计划</b> <span class="due">1→2→4→7→15→30 天 · 复盘做对顺延、做错回明天</span>'+
+    '<div class="row" style="margin-top:6px">'+(dueItems.length?'<button class="btn pri sm" onclick="reviewAll()">🔁 开始复盘（'+dueItems.length+' 题）</button>':'<span class="state" style="margin:0">今天没有要复盘的题 ✓</span>')+
+    '<span class="due" style="margin-left:4px">明天 '+d1+' · 后天 '+d2+' · 3~7天内 '+d7+' · 更远 '+d30+'</span></div></div>';
   if(!items.length){list.innerHTML='<div class="state">还没有错题。讲题页有「收进错题本」按钮。</div>';return}
   list.innerHTML=items.map(w=>{
-    const due=w.due<=now?'<span class="due today">该复习了！</span>':'<span class="due">'+new Date(w.due).toLocaleDateString("zh-CN")+' 复习</span>';
+    const due=w.due<=now?'<span class="due today">该复盘了！</span>':'<span class="due">'+new Date(w.due).toLocaleDateString("zh-CN")+' 复盘</span>';
     return '<div class="wcard"><div class="qtext">'+esc(w.q.slice(0,140))+'</div>'+
       (w.tag?'<span class="tag red">'+esc(w.tag)+'</span>':'')+
       '<span class="tag">'+esc(SUBJ[w.subj]?SUBJ[w.subj].n:w.subj||"")+(w.chap?("·"+esc(w.chap)):"")+'</span> '+due+
       '<details><summary>看讲解</summary><div class="answer">'+fmt(w.text)+'</div></details>'+
-      '<div class="row"><button class="btn sm" onclick="reviewWrong('+w.id+',1)">复习通过✓</button><button class="btn sm" onclick="reviewWrong('+w.id+',0)">又错了✗</button><button class="btn sm" onclick="delWrong('+w.id+')">删除</button></div></div>';
+      '<div class="row"><button class="btn sm pri" onclick="reviewRedo('+w.id+')">🔁 复盘重做</button><button class="btn sm" onclick="reviewWrong('+w.id+',1)">复习通过✓</button><button class="btn sm" onclick="reviewWrong('+w.id+',0)">又错了✗</button><button class="btn sm" onclick="planWrong('+w.id+')">📅 改期</button><button class="btn sm" onclick="delWrong('+w.id+')">删除</button></div></div>';
   }).join("");
 }
 function reviewWrong(id,ok){
@@ -670,6 +746,35 @@ function reviewWrong(id,ok){
   if(ok){w.stage=Math.min(w.stage+1,EBB.length-1);w.due=Date.now()+EBB[w.stage]*864e5;toast("记住了，"+EBB[w.stage]+"天后再来")}
   else{w.stage=0;w.due=Date.now()+864e5;toast("回到明天再战")}
   save();renderWrong();
+}
+/* 复盘重做：把错题原题重新走一遍分支引导，通关后自动顺延复盘期 */
+function reviewRedo(id){
+  const w=S.wrong.find(x=>x.id===id);if(!w)return;
+  const oldSubj=S.subj;
+  if(w.subj&&SUBJ[w.subj])S.subj=w.subj;
+  showTab("tab-ask");
+  startGuided(w.q,w.chap||"");
+  if(GS)GS.reviewId=id;
+  S.subj=oldSubj;
+}
+function reviewAll(){
+  const now=Date.now();
+  const w=S.wrong.filter(x=>x.due<=now).sort((a,b)=>a.due-b.due)[0];
+  if(!w){toast("今天没有要复盘的题");return}
+  reviewRedo(w.id);
+}
+function planWrong(id){
+  const w=S.wrong.find(x=>x.id===id);if(!w)return;
+  const d=prompt("改到几天后复盘？（填数字，1=明天，7=一周后）","2");
+  if(d===null)return;
+  const n=Math.round(+d);
+  if(!n||n<1){toast("要填正整数哦");return}
+  w.due=Date.now()+n*864e5;save();renderWrong();toast(n+"天后复盘");
+}
+function updateDueBadge(){
+  const now=Date.now(),n=S.wrong.filter(w=>w.due<=now).length;
+  const el=D.getElementById("tabDue");if(!el)return;
+  el.textContent=n?("应复盘 "+n):"";el.classList.toggle("hide",!n);
 }
 function delWrong(id){S.wrong=S.wrong.filter(x=>x.id!==id);save();renderWrong()}
 
@@ -709,7 +814,7 @@ function testCfg(){
 
 /* ---------- 启动 ---------- */
 D.getElementById("gradeSel").addEventListener("change",e=>{S.grade=e.target.value;if(!subjOf(S.stage,S.grade).includes(S.subj))S.subj=subjOf(S.stage,S.grade)[0];save();renderSubj();toast("已切到"+S.grade+"，科目和章节已同步")});
-renderSubj();fillCfg();drawQuota();
+renderSubj();fillCfg();drawQuota();updateDueBadge();
 if(S.hist.length){const box=D.getElementById("askResult");S.hist.slice(0,5).forEach(h=>{
   const card=D.createElement("div");card.className="card";
   card.innerHTML='<div class="qtext">'+esc(h.q)+'</div><div style="margin-bottom:6px"><span class="tag">'+esc(SUBJ[h.subj]?SUBJ[h.subj].n:h.subj||"")+(h.chap?("·"+esc(h.chap)):"")+'</span></div><div class="answer">'+fmt(h.text)+'</div><div class="via">'+new Date(h.t).toLocaleString("zh-CN")+(h.via?(" · "+esc(h.via)):"")+'</div>';
