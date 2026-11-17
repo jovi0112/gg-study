@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>果果学习版 v2</title>
+<title>果果学习版 v6</title>
 <style>
 :root{--bg:#f4f6fa;--card:#fff;--ink:#1c2333;--sub:#66708a;--pri:#3b6ef5;--pri2:#eef3ff;--ok:#1a9e5c;--warn:#c2410c;--line:#e3e8f2;--red:#d64545}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -52,11 +52,18 @@ details{margin-top:6px}summary{cursor:pointer;color:var(--pri);font-size:13px}
 #previewBox img{max-width:100%;border-radius:10px;margin:8px 0}
 .via{font-size:11px;color:var(--sub);margin-top:8px}
 .variant{border-top:1px dashed var(--line);padding-top:8px;margin-top:8px}
+/* 分支引导对话 */
+.gchat{display:flex;flex-direction:column}
+.gmsg{max-width:88%;padding:8px 12px;border-radius:12px;margin:6px 0;font-size:14px;white-space:pre-wrap;word-break:break-word}
+.gmsg.ai{background:var(--pri2);align-self:flex-start;border-top-left-radius:4px}
+.gmsg.me{background:#e7f6ee;align-self:flex-end;border-top-right-radius:4px}
+.gin{display:flex;gap:6px;margin-top:8px;align-items:flex-end}
+.gin textarea{flex:1;min-height:44px;width:auto;resize:none}
 .hide{display:none}
 </style>
 </head>
 <body>
-<header><b>果果学习版 <i>v2</i></b><span style="display:flex;gap:8px;align-items:center"><span id="qChip" onclick="quotaInfo()" title="累计AI流量">⚡…</span><button class="btn sm" onclick="showTab('tab-set')">⚙ 设置</button></span></header>
+<header><b>果果学习版 <i>v6</i></b><span style="display:flex;gap:8px;align-items:center"><span id="qChip" onclick="quotaInfo()" title="累计AI流量">⚡…</span><button class="btn sm" onclick="showTab('tab-set')">⚙ 设置</button></span></header>
 <nav id="tabs">
   <button class="on" data-t="tab-ask" onclick="showTab('tab-ask')">💬 讲题</button>
   <button data-t="tab-photo" onclick="showTab('tab-photo')">📷 拍题</button>
@@ -78,9 +85,8 @@ details{margin-top:6px}summary{cursor:pointer;color:var(--pri);font-size:13px}
       <textarea id="qBox" placeholder="把题目打进来，或者说说你卡在哪了…（电脑上还能 Ctrl+V 粘贴截图到拍题页）"></textarea>
     </div>
     <div style="margin-top:8px">
-      <span style="font-size:13px;color:var(--sub)">讲法：</span>
-      <span class="chip on" id="mHint" onclick="setMode(true)">🔍 先引导我（不给答案）</span>
-      <span class="chip" id="mFull" onclick="setMode(false)">📖 直接讲清楚</span>
+      <span class="tag ok">🔍 分支引导模式</span>
+      <span style="font-size:13px;color:var(--sub)">AI 不给答案——先问你的思路，再按你的思路推演「会走到哪、哪一步岔了」，一路问到你自己做出来。</span>
     </div>
     <div class="row"><button class="btn pri" id="askBtn" onclick="ask()">问一问</button></div>
     <div id="askState" class="state"></div>
@@ -103,10 +109,9 @@ details{margin-top:6px}summary{cursor:pointer;color:var(--pri);font-size:13px}
       <h3 style="margin-top:8px">AI 抄的题（可改）</h3>
       <textarea id="ocrText" style="min-height:90px"></textarea>
       <div class="row">
-        <button class="btn" onclick="useOcr(false)">🔍 引导我讲</button>
-        <button class="btn pri" onclick="useOcr(true)">📖 直接讲清楚</button>
+        <button class="btn pri" onclick="useOcr()">🔍 引导我讲（不给答案）</button>
       </div>
-      <div class="state">抄写员只抄题不讲题；认不出的字会写成 □，记得自己改一下。</div>
+      <div class="state">抄写员只抄题不讲题；认不出的字会写成 □，记得自己改一下。讲题全程引导、不给答案。</div>
     </div>
   </div>
 </section>
@@ -251,70 +256,100 @@ function renderSubj(){
   const mapBox=D.getElementById("mapChips");mapBox.innerHTML="";
   Object.keys(SUBJ).forEach(k=>{const b=D.createElement("span");b.className="chip"+(S.subj===k?" on":"");b.textContent=SUBJ[k].n;b.onclick=()=>{S.subj=k;save();renderSubj()};mapBox.appendChild(b)});
 }
-function setMode(hint){S.mode=hint;save();D.getElementById("mHint").classList.toggle("on",hint);D.getElementById("mFull").classList.toggle("on",!hint)}
-
-/* ---------- 讲题核心 ---------- */
-const BASE_SYS="你是给13岁初一学生讲题的老师。铁律：全程简体中文；像家长讲题，不要书面腔；先易后难；OCR 或转述里如有错别字，按上下文猜含义再答，不要纠结；不确定的明说不确定。";
-function hintSys(){return BASE_SYS+"\n你现在处于【引导模式】：按四步讲——①这题在问什么(≤40字)②关键线索(≤60字)③解题思路2-3步(只讲怎么想，绝不许出现最终数值答案或最终结论)④易错点(≤30字)。禁止给出最终答案。"}
-function fullSys(){return BASE_SYS+"\n讲题要求：第一行直接给答案（用【答案】开头），然后分步骤讲为什么（步骤≤5步，每步≤40字），最后以「📌 记住这句：」开头给一句记住的话。"}
-let last=null; // 最近一次问答上下文
-async function ask(){
+/* ---------- 讲题核心：思路分支引导（v6，绝不直接给答案） ---------- */
+const BASE_SYS="你是给13岁初一学生讲题的老师。铁律：全程简体中文；像家长讲题，不要书面腔；先易后难；题目转述里如有错别字，按上下文猜含义再答，不要纠结；不确定的明说不确定。";
+function branchSys(){return BASE_SYS+"\n你现在处于【思路分支引导】模式——这是本产品最大的特色：绝不直接给答案。规则：\n①第一回合：先用≤50字说这题在问什么，再列1-2条关键线索，最后必须以「你的思路是？说说你打算怎么做，哪怕只想到第一步」结尾。不许开始讲正确解法。\n②孩子说了想法后，严格按这个格式回：\n【跟着你走】按孩子的思路往下推，说清楚照这样做会得到什么结果；\n【岔路口】指出从哪一步开始跑偏、为什么会跑偏（孩子思路里对的部分先肯定）；\n【反问】只提一个问题，把孩子拉回正路。不许在【跟着你走】【岔路口】里给出正确解法或最终答案。\n③孩子每做对一步就明确肯定，再引向下一步。\n④当孩子自己说出正确结果时，第一行以【通关】开头，先肯定，再让孩子用自己的话复述关键的一步。\n⑤孩子连续2轮说不知道时，退一步给更基础的铺垫小问题（比如先问一个更简单的同类题），但仍然不给答案。\n⑥每轮回复≤180字，口语化，多用「你」。\n⑦除非孩子明确点了「看完整讲解」（那时系统会附加指令），全程禁止出现本题的最终数值答案或完整解题步骤。"}
+let GS=null; // 当前引导会话
+function ask(){
   const q=D.getElementById("qBox").value.trim();
   if(!q){toast("先输入问题哦");return}
   const chap=D.getElementById("chapSel").value||"";
-  runAsk(q,chap,null);
+  startGuided(q,chap);
 }
-async function runAsk(q,chap,ctx){
-  const st=D.getElementById("askState"),btn=D.getElementById("askBtn");
-  btn.disabled=true;st.className="state";st.textContent="AI 想题中…";
-  const msgs=[{role:"system",content:S.mode?hintSys():fullSys()},
-    {role:"user",content:(chap?("科目："+SUBJ[S.subj].n+"，章节："+chap+"。\n"):"")+"我的问题："+q}];
-  if(ctx)msgs.push({role:"user",content:ctx});
-  try{
-    const {text,via}=await chat(msgs,{max:1300});
-    st.textContent="";
-    last={q,chap,sys:S.mode?"hint":"full"};
-    renderAnswer(q,text,via,chap,false);
-  }catch(e){st.className="state err";st.textContent="出错了："+e.message+"（可在设置里检查通道）"}
-  btn.disabled=false;
+function gsSaveHist(G){
+  const talk=G.msgs.filter(m=>m.role!=="system").map(m=>(m.role==="assistant"?"老师：":"我：")+m.content).join("\n");
+  S.hist.unshift({t:Date.now(),subj:S.subj,chap:G.chap||"",q:G.q,text:talk.slice(0,900),via:G.via||""});
+  if(S.hist.length>80)S.hist.pop();save();
 }
-function renderAnswer(q,text,via,chap,isImg){
+function startGuided(q,chap){
+  if(GS&&!GS.ended)gsClose(GS,true); // 上一题没结束就开新题，自动收尾
   const box=D.getElementById("askResult");
   const card=D.createElement("div");card.className="card";
-  const meta='<span class="tag">'+esc(SUBJ[S.subj].n)+(chap?(" · "+esc(chap)):"")+'</span>'+(isImg?'<span class="tag">📷 拍题</span>':'');
-  card.innerHTML='<div class="qtext">'+esc(q)+'</div><div style="margin-bottom:8px">'+meta+'</div><div class="answer">'+fmt(text)+'</div>';
-  // 追问按钮组
-  const acts=D.createElement("div");acts.className="chips";acts.style.marginTop="10px";
-  [["再讲细一点","请把上面讲解中孩子最可能卡住的那一步，拆得更细地再讲一遍，仍"+(S.mode?"不要给出最终答案":"")],
-   ["换个方法","换一种和刚才不同的思路来讲这道题，"+(S.mode?"同样不要给出最终答案":"给出答案")],
-   ["出3道变式","围绕这道题的知识点出3道变式题（由易到难），答案与题目分开，放最后"],
-   ["📕 红笔批改(读心)","我是做题的学生。请按「读心模式」分析：结合这道题和我的讲解，猜猜我可能在哪一步、哪个概念上想岔了，用红笔批改的口吻（严厉但温和，不嘲笑但不回避）。"],
-   ["🎤 我讲给你听","现在换我当老师：我用自己的话讲一遍解题思路（我会打字发给你）。请你听完后给1-5分，指出讲对了什么、漏了什么，鼓励一下我。"]
-  ].forEach(([lab,prompt])=>{
-    const b=D.createElement("span");b.className="chip";b.textContent=lab;
-    b.onclick=()=>followUp(lab,prompt,card);acts.appendChild(b);
-  });
-  if(S.mode){const esc2=D.createElement("span");esc2.className="chip";esc2.style.background="#fff7ed";esc2.style.color="#c2410c";esc2.textContent="我看好啦，看完整讲解";
-    esc2.onclick=()=>{S.mode=false;setMode(false);last.sys="full";followUp("看完整讲解","好，我现在想完了。请给我这道题的完整讲解："+last.q,card)};acts.appendChild(esc2)}
-  card.appendChild(acts);
-  // 收藏错题按钮
-  const fav=D.createElement("div");fav.className="row";fav.style.marginTop="8px";
-  const fb=D.createElement("button");fb.className="btn sm";fb.textContent="＋ 收进错题本";
-  fb.onclick=()=>{addWrong({q,text:card.querySelector(".answer").textContent,tag:"",chap:chap||"",img:!!isImg});toast("已收进错题本")};
-  fav.appendChild(fb);card.appendChild(fav);
-  const viaEl=D.createElement("div");viaEl.className="via";viaEl.textContent="通道："+via;card.appendChild(viaEl);
+  card.innerHTML='<div class="qtext">'+esc(q)+'</div><div style="margin-bottom:6px"><span class="tag">'+esc(SUBJ[S.subj].n)+(chap?(" · "+esc(chap)):"")+'</span><span class="tag ok">🔍 分支引导 · 不给答案</span></div><div class="gchat"></div>';
+  const chatBox=card.querySelector(".gchat");
+  const st=D.createElement("div");st.className="state";st.textContent="AI 老师正在看题…";
+  const inWrap=D.createElement("div");inWrap.className="gin hide";
+  const ta=D.createElement("textarea");ta.placeholder="说说你的思路，或回答老师的问题…（说「不知道」也没关系）";
+  const send=D.createElement("button");send.className="btn sm pri";send.style.flex="none";send.textContent="发送";
+  inWrap.appendChild(ta);inWrap.appendChild(send);
+  const acts=D.createElement("div");acts.className="chips";acts.style.marginTop="8px";
+  card.appendChild(chatBox);card.appendChild(st);card.appendChild(inWrap);card.appendChild(acts);
   box.insertBefore(card,box.firstChild);
-  S.hist.unshift({t:Date.now(),subj:S.subj,chap,q,text,via});if(S.hist.length>80)S.hist.pop();save();
+  const G=GS={q,chap,rounds:0,done:false,ended:false,revealed:false,via:"",msgs:[{role:"system",content:branchSys()},{role:"user",content:(chap?("科目："+SUBJ[S.subj].n+"，章节："+chap+"。\n"):"")+"题目："+q}],card,chatBox,st,inWrap,ta,send,acts};
+  send.onclick=()=>gsSend(G);
+  gsChip(G,"📕 红笔批改(读心)","（孩子点了「红笔批改」：请暂停引导流程，结合上面整段对话，用红笔批改的口吻指出我可能在哪一步、哪个概念上想岔了——严厉但温和，不嘲笑但不回避。可以点出正确的概念方向，但不要给出本题的最终数值答案。）");
+  const rev=D.createElement("span");rev.className="chip";rev.textContent="🔍 看完整讲解";
+  rev.onclick=()=>gsReveal(G);acts.appendChild(rev);
+  const end=D.createElement("span");end.className="chip";end.textContent="结束引导";
+  end.onclick=()=>gsClose(G,false);acts.appendChild(end);
+  gsStep(G);
 }
-async function followUp(lab,prompt,card){
-  const st=D.getElementById("askState");st.className="state";st.textContent="AI 处理中…";
-  const sys=last&&last.sys==="hint"?hintSys():fullSys();
-  const msgs=[{role:"system",content:sys},{role:"user",content:"原题："+(last?last.q:"")+"\n刚才的讲解："+(card.querySelector(".answer").textContent.slice(0,800))+"\n\n我的请求："+prompt}];
+function gsChip(G,label,prompt){
+  const b=D.createElement("span");b.className="chip";b.textContent=label;
+  b.onclick=()=>{
+    if(G.ended){toast("这一题的引导已结束");return}
+    G.msgs.push({role:"user",content:prompt});
+    const m=D.createElement("div");m.className="gmsg me";m.textContent=label;G.chatBox.appendChild(m);
+    gsStep(G);
+  };
+  G.acts.insertBefore(b,G.acts.querySelector(".chip:last-child")); // 排在「结束引导」前
+}
+async function gsStep(G){
+  if(G.ended)return;
+  G.st.className="state";G.st.textContent="AI 老师想题中…";
+  G.inWrap.classList.add("hide");
   try{
-    const {text,via}=await chat(msgs,{max:1500});
-    st.textContent="";
-    renderAnswer("【"+lab+"】"+(last?last.q:""),text,via,last?last.chap:"",false);
-  }catch(e){st.className="state err";st.textContent="出错了："+e.message}
+    const {text,via}=await chat(G.msgs,{max:900,temp:.5});
+    G.via=via;G.st.textContent="";
+    G.msgs.push({role:"assistant",content:text});
+    const m=D.createElement("div");m.className="gmsg ai";m.innerHTML=fmt(text);G.chatBox.appendChild(m);
+    if(/^\s*【通关】/.test(text)){G.done=true;gsWin(G)}
+    else{G.rounds++;G.inWrap.classList.remove("hide")}
+  }catch(e){G.st.className="state err";G.st.textContent="出错了："+e.message;G.inWrap.classList.remove("hide")}
+}
+function gsSend(G){
+  const t=G.ta.value.trim();if(!t){toast("先说说你的想法哦");return}
+  const m=D.createElement("div");m.className="gmsg me";m.textContent=t;G.chatBox.appendChild(m);
+  G.ta.value="";G.msgs.push({role:"user",content:t});
+  gsStep(G);
+}
+function gsWin(G){
+  gsChip(G,"出3道变式","（孩子已经自己做出这道题了。请围绕它的知识点出3道变式题，由易到难，答案与题目分开、放在最后。）");
+  const fav=D.createElement("span");fav.className="chip";fav.style.background="#fff7ed";fav.style.color="#c2410c";fav.textContent="＋ 收进错题本";
+  fav.onclick=()=>{const talk=G.msgs.filter(m=>m.role==="assistant").slice(0,3).map(m=>m.content).join("\n");addWrong({q:G.q,text:talk.slice(0,1000),tag:"",chap:G.chap||""});toast("已收进错题本")};
+  G.acts.insertBefore(fav,G.acts.lastChild);
+  G.inWrap.classList.add("hide");
+  G.st.className="state";G.st.textContent="🎉 自己做出来了！想再练就点「出3道变式」，或重新问一题。";
+  gsSaveHist(G);
+}
+async function gsReveal(G){
+  if(G.revealed)return;
+  if(!confirm("确定现在看完整讲解？再多引导几轮，印象会深很多哦。"))return;
+  G.inWrap.classList.add("hide");G.st.className="state";G.st.textContent="生成完整讲解中…";
+  try{
+    const msgs=G.msgs.concat([{role:"user",content:"（系统指令：孩子确认结束引导，现在给完整讲解：第一行直接给答案（以【答案】开头），然后分步骤讲为什么（≤5步，每步≤40字），最后以「📌 记住这句：」开头给一句记住的话。）"}]);
+    const {text,via}=await chat(msgs,{max:1100});
+    G.msgs.push({role:"assistant",content:"【完整讲解】"+text});
+    const m=D.createElement("div");m.className="gmsg ai";m.innerHTML='<span class="tag">完整讲解</span>\n'+fmt(text);G.chatBox.appendChild(m);
+    G.st.textContent="";G.revealed=true;G.ended=true;G.inWrap.classList.add("hide");
+    gsSaveHist(G);
+  }catch(e){G.st.className="state err";G.st.textContent="出错了："+e.message;G.inWrap.classList.remove("hide")}
+}
+function gsClose(G,auto){
+  if(G.ended)return;
+  G.ended=true;G.inWrap.classList.add("hide");
+  if(!G.done&&!G.revealed)gsSaveHist(G);
+  G.st.className="state";G.st.textContent=auto?"（这一题的引导已自动结束）":"引导已结束。要继续就在上面输入新的题目。";
 }
 
 /* ---------- 拍题（双遍视觉） ---------- */
@@ -358,13 +393,12 @@ function compress(file){return new Promise(res=>{
     cv.getContext("2d").drawImage(img,0,0,w,h);
     res(cv.toDataURL("image/jpeg",.82))};
   rd.readAsDataURL(file)})}
-function useOcr(full){
+function useOcr(){
   const q=D.getElementById("ocrText").value.trim();if(!q){toast("还没有抄题内容");return}
   const chap=D.getElementById("chapSel").value||"";
-  S.mode=!full;setMode(!full);
   showTab("tab-ask");
   D.getElementById("qBox").value=q;
-  runAsk(q,chap,null);
+  startGuided(q,chap);
 }
 
 /* ---------- 思维导图 ---------- */
@@ -607,7 +641,7 @@ function exportData(){
 D.getElementById("impIn").addEventListener("change",e=>{
   const f=e.target.files[0];if(!f)return;
   const rd=new FileReader();
-  rd.onload=()=>{try{const d=JSON.parse(rd.result);Object.keys(d).forEach(k=>S[k]=d[k]);save();renderSubj();setMode(S.mode);toast("导入成功")}catch(err){toast("文件不对："+err.message)}};
+  rd.onload=()=>{try{const d=JSON.parse(rd.result);Object.keys(d).forEach(k=>S[k]=d[k]);save();renderSubj();toast("导入成功")}catch(err){toast("文件不对："+err.message)}};
   rd.readAsText(f);
 });
 function testCfg(){
@@ -616,7 +650,7 @@ function testCfg(){
 }
 
 /* ---------- 启动 ---------- */
-renderSubj();setMode(S.mode);fillCfg();drawQuota();
+renderSubj();fillCfg();drawQuota();
 if(S.hist.length){const box=D.getElementById("askResult");S.hist.slice(0,5).forEach(h=>{
   const card=D.createElement("div");card.className="card";
   card.innerHTML='<div class="qtext">'+esc(h.q)+'</div><div style="margin-bottom:6px"><span class="tag">'+esc(SUBJ[h.subj]?SUBJ[h.subj].n:h.subj||"")+(h.chap?("·"+esc(h.chap)):"")+'</span></div><div class="answer">'+fmt(h.text)+'</div><div class="via">'+new Date(h.t).toLocaleString("zh-CN")+(h.via?(" · "+esc(h.via)):"")+'</div>';
