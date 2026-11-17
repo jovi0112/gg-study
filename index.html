@@ -204,7 +204,7 @@ function toast(m){const t=D.getElementById("toast");t.textContent=m;t.classList.
 function showTab(id){document.querySelectorAll("main section").forEach(s=>s.classList.add("hide"));D.getElementById(id).classList.remove("hide");document.querySelectorAll("#tabs button").forEach(b=>b.classList.toggle("on",b.dataset.t===id));if(id==="tab-wrong")renderWrong();if(id==="tab-report")renderReport();if(id==="tab-map")renderMapHist()}
 
 /* ---------- API 通道 ---------- */
-const DEF={aliUrl:"https://ws-3wgqxrgyi9wqh36.cn-beijing.maas.aliyuncs.com/compatible-mode/v1/chat/completions",aliKey:"",aliTxt:"cmaas-qwen3.8-flash",aliVl:"qwen3-vl-plus",dsKey:"sk-5bb206f385b34747bb847f892df48e3b",dsUrl:"https://api.deepseek.com/chat/completions",dsModel:"deepseek-chat"};
+const DEF={aliUrl:"https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",aliKey:"sk-ws-H.YYPHRXY.hXfI.MEYCIQCnUhXvEitrPsYB17T0MzkyUXocG0gSLDFaTKQwulb9YAIhAIWl8rAEVX2Ls8U-5WfN44ZsPCdxplNzMxXGfXEBF1rC",aliTxt:"qwen-plus",aliVl:"qwen3-vl-plus",dsKey:"sk-5bb206f385b34747bb847f892df48e3b",dsUrl:"https://api.deepseek.com/chat/completions",dsModel:"deepseek-chat"};
 function cfg(){return Object.assign({},DEF,S.cfg||{})}
 function fillCfg(){const c=cfg();D.getElementById("cfgAliUrl").value=c.aliUrl;D.getElementById("cfgAliKey").value=c.aliKey;D.getElementById("cfgAliTxt").value=c.aliTxt;D.getElementById("cfgAliVl").value=c.aliVl;D.getElementById("cfgDsKey").value=c.dsKey}
 function saveCfg(){S.cfg={aliUrl:D.getElementById("cfgAliUrl").value.trim(),aliKey:D.getElementById("cfgAliKey").value.trim(),aliTxt:D.getElementById("cfgAliTxt").value.trim(),aliVl:D.getElementById("cfgAliVl").value.trim(),dsKey:D.getElementById("cfgDsKey").value.trim()};save();toast("配置已保存")}
