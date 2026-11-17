@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>果果学习版 v7.1</title>
+<title>果果学习版 v7.2</title>
 <style>
 :root{--bg:#f4f6fa;--card:#fff;--ink:#1c2333;--sub:#66708a;--pri:#3b6ef5;--pri2:#eef3ff;--ok:#1a9e5c;--warn:#c2410c;--line:#e3e8f2;--red:#d64545}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -63,7 +63,7 @@ details{margin-top:6px}summary{cursor:pointer;color:var(--pri);font-size:13px}
 </style>
 </head>
 <body>
-<header><b>果果学习版 <i>v7.1</i></b><span style="display:flex;gap:8px;align-items:center"><span id="qChip" onclick="quotaInfo()" title="累计AI流量">⚡…</span><button class="btn sm" onclick="showTab('tab-set')">⚙ 设置</button></span></header>
+<header><b>果果学习版 <i>v7.2</i></b><span style="display:flex;gap:8px;align-items:center"><span id="qChip" onclick="quotaInfo()" title="累计AI流量">⚡…</span><button class="btn sm" onclick="showTab('tab-set')">⚙ 设置</button></span></header>
 <nav id="tabs">
   <button class="on" data-t="tab-ask" onclick="showTab('tab-ask')">💬 讲题</button>
   <button data-t="tab-photo" onclick="showTab('tab-photo')">📷 拍题</button>
@@ -311,7 +311,7 @@ function renderSubj(){
 /* ---------- 讲题核心：思路分支引导（v6，绝不直接给答案） ---------- */
 /* v7：学段锚定——每条提示词都带 学段/年级/科目/章节，并明令不许超纲 */
 function baseSys(){return "你是给"+ageOf()+"讲题的老师。铁律：全程简体中文；像家长讲题，不要书面腔；先易后难；题目转述里如有错别字，按上下文猜含义再答，不要纠结；不确定的明说不确定。讲解深度必须严格贴合"+S.stage+S.grade+"教材：不许用后面年级才学的方法（超纲），也不要过于浅显（降智）。"}
-function branchSys(){return baseSys()+"\n你现在处于【思路分支引导】模式——这是本产品最大的特色：绝不直接给答案。规则：\n①第一回合：先用≤50字说这题在问什么，再列1-2条关键线索，最后必须以「你的思路是？说说你打算怎么做，哪怕只想到第一步」结尾。不许开始讲正确解法。\n②孩子说了想法后，严格按这个格式回：\n【跟着你走】按孩子的思路往下推，说清楚照这样做会得到什么结果；\n【岔路口】指出从哪一步开始跑偏、为什么会跑偏（孩子思路里对的部分先肯定）；\n【反问】只提一个问题，把孩子拉回正路。不许在【跟着你走】【岔路口】里给出正确解法或最终答案。\n③孩子每做对一步就明确肯定，再引向下一步。\n④当孩子自己说出正确结果时，第一行以【通关】开头，先肯定，再让孩子用自己的话复述关键的一步。\n⑤孩子连续2轮说不知道时，退一步给更基础的铺垫小问题（比如先问一个更简单的同类题），但仍然不给答案。\n⑥每轮回复≤180字，口语化，多用「你」。\n⑦除非孩子明确点了「看完整讲解」（那时系统会附加指令），全程禁止出现本题的最终数值答案或完整解题步骤。"}
+function branchSys(){return baseSys()+"\n你现在处于【思路分支引导】模式——这是本产品最大的特色：绝不直接给答案。规则：\n①第一回合：先用≤50字说这题在问什么，再列1-2条关键线索，最后必须以「你的思路是？说说你打算怎么做，哪怕只想到第一步」结尾。不许开始讲正确解法。\n②孩子说了想法后，严格按这个格式回：\n【跟着你走】按孩子的思路往下推，说清楚照这样做会得到什么结果；\n【岔路口】指出从哪一步开始跑偏、为什么会跑偏（孩子思路里对的部分先肯定）；\n【反问】只提一个问题，把孩子拉回正路。不许在【跟着你走】【岔路口】里给出正确解法或最终答案。\n③孩子每做对一步就明确肯定，再引向下一步。\n④当孩子自己说出正确结果时，第一行以【通关】开头，先肯定，再让孩子用自己的话复述关键的一步。\n⑤【零思路救援】孩子说「不知道/不会/没思路」时：\n　·第1次：绝不重复问「再想想」。把题目拆到最小：只拎出题目的第一个条件或第一个数字，问「光看这个，它能告诉你什么？」。\n　·第2次仍不知道（或孩子点了救援按钮）：第一行以【铺垫】开头，进入铺垫模式——先带孩子把原题拆成「已知__，要求__」两个填空让TA补全，然后出一道同章节、知识点相同但数字明显更简单的热身题，让孩子先做热身题。\n　·热身题孩子答对：直接肯定。答错或说不知道：先给一句纠错提示让TA再试一次；TA再答错或再说不知道，就直接给热身题的答案和一句讲解（热身题是新题，可以给答案），然后只问「刚才那题用的方法，放到原题上，第一步该做什么？」——这一步只提问，绝不替孩子算出原题的任何中间结果或最终答案；孩子说出第一步后再按规则②正常引导。\n　·铁律：铺垫和热身题里也绝不出现原题的最终答案；任何回合都不许写出原题的完整解方程过程或最终解（哪怕孩子答对了热身题）。\n⑥每轮回复≤180字，口语化，多用「你」。除非孩子明确点了「看完整讲解」（那时系统会附加指令），全程禁止出现本题的最终数值答案或完整解题步骤。"}
 let GS=null; // 当前引导会话
 function ask(){
   const q=D.getElementById("qBox").value.trim();
@@ -341,6 +341,7 @@ function startGuided(q,chap){
   const G=GS={q,chap,rounds:0,done:false,ended:false,revealed:false,via:"",msgs:[{role:"system",content:branchSys()},{role:"user",content:"学段："+S.stage+S.grade+"，科目："+SUBJ[S.subj].n+(chap?("，章节："+chap):"")+"。\n题目："+q}],card,chatBox,st,inWrap,ta,send,acts};
   send.onclick=()=>gsSend(G);
   gsChip(G,"📕 红笔批改(读心)","（孩子点了「红笔批改」：请暂停引导流程，结合上面整段对话，用红笔批改的口吻指出我可能在哪一步、哪个概念上想岔了——严厉但温和，不嘲笑但不回避。可以点出正确的概念方向，但不要给出本题的最终数值答案。）");
+  gsChip(G,"🆘 一点思路都没有","（孩子确认完全没有任何思路，请立即按规则⑤进入铺垫模式：先把原题拆成「已知__，要求__」两个填空让我补全，然后出一道同章节、数字明显更简单的热身题让我先做。热身题答完你可以给它的答案，但映射回原题时只提问「第一步该做什么」，绝不替我算出原题的任何中间结果或最终答案。）");
   const rev=D.createElement("span");rev.className="chip";rev.textContent="🔍 看完整讲解";
   rev.onclick=()=>gsReveal(G);acts.appendChild(rev);
   const end=D.createElement("span");end.className="chip";end.textContent="结束引导";
@@ -351,6 +352,7 @@ function gsChip(G,label,prompt){
   const b=D.createElement("span");b.className="chip";b.textContent=label;
   b.onclick=()=>{
     if(G.ended){toast("这一题的引导已结束");return}
+    if(G.busy){toast("老师还在想，等他这句说完再点哦");return}
     G.msgs.push({role:"user",content:prompt});
     const m=D.createElement("div");m.className="gmsg me";m.textContent=label;G.chatBox.appendChild(m);
     gsStep(G);
@@ -359,6 +361,7 @@ function gsChip(G,label,prompt){
 }
 async function gsStep(G){
   if(G.ended)return;
+  G.busy=true;
   G.st.className="state";G.st.textContent="AI 老师想题中…";
   G.inWrap.classList.add("hide");
   try{
@@ -369,8 +372,10 @@ async function gsStep(G){
     if(/^\s*【通关】/.test(text)){G.done=true;gsWin(G)}
     else{G.rounds++;G.inWrap.classList.remove("hide")}
   }catch(e){G.st.className="state err";G.st.textContent="出错了："+e.message;G.inWrap.classList.remove("hide")}
+  finally{G.busy=false}
 }
 function gsSend(G){
+  if(G.busy){toast("老师还在想，等他这句说完再发哦");return}
   const t=G.ta.value.trim();if(!t){toast("先说说你的想法哦");return}
   const m=D.createElement("div");m.className="gmsg me";m.textContent=t;G.chatBox.appendChild(m);
   G.ta.value="";G.msgs.push({role:"user",content:t});
