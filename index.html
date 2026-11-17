@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>果果学习版 v7.4</title>
+<title>果果学习版 v7.5</title>
 <style>
 :root{--bg:#f4f6fa;--card:#fff;--ink:#1c2333;--sub:#66708a;--pri:#3b6ef5;--pri2:#eef3ff;--ok:#1a9e5c;--warn:#c2410c;--line:#e3e8f2;--red:#d64545}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -57,13 +57,16 @@ details{margin-top:6px}summary{cursor:pointer;color:var(--pri);font-size:13px}
 .gmsg{max-width:88%;padding:8px 12px;border-radius:12px;margin:6px 0;font-size:14px;white-space:pre-wrap;word-break:break-word}
 .gmsg.ai{background:var(--pri2);align-self:flex-start;border-top-left-radius:4px}
 .gmsg.me{background:#e7f6ee;align-self:flex-end;border-top-right-radius:4px}
+.mindbox{width:100%;max-width:100%;border:1px dashed var(--line);border-radius:12px;padding:12px;margin:6px 0;background:#fffbeb}
+.mindbox .mlabel{font-size:13px;color:var(--sub);margin:8px 0 4px}
+.mindbox .minput{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:8px;padding:8px;font-size:14px}
 .gin{display:flex;gap:6px;margin-top:8px;align-items:flex-end}
 .gin textarea{flex:1;min-height:44px;width:auto;resize:none}
 .hide{display:none}
 </style>
 </head>
 <body>
-<header><b>果果学习版 <i>v7.4</i></b><span style="display:flex;gap:8px;align-items:center"><span id="qChip" onclick="quotaInfo()" title="累计AI流量">⚡…</span><button class="btn sm" onclick="showTab('tab-set')">⚙ 设置</button></span></header>
+<header><b>果果学习版 <i>v7.5</i></b><span style="display:flex;gap:8px;align-items:center"><span id="qChip" onclick="quotaInfo()" title="累计AI流量">⚡…</span><button class="btn sm" onclick="showTab('tab-set')">⚙ 设置</button></span></header>
 <nav id="tabs">
   <button class="on" data-t="tab-ask" onclick="showTab('tab-ask')">💬 讲题</button>
   <button data-t="tab-photo" onclick="showTab('tab-photo')">📷 拍题</button>
@@ -330,7 +333,8 @@ function gsSaveHist(G){
   S.hist.unshift({t:Date.now(),subj:S.subj,chap:G.chap||"",q:G.q,text:talk.slice(0,900),via:G.via||""});
   if(S.hist.length>80)S.hist.pop();save();
 }
-function startGuided(q,chap){
+function startGuided(q,chap,opts){
+  opts=opts||{};
   if(GS&&!GS.ended)gsClose(GS,true); // 上一题没结束就开新题，自动收尾
   const box=D.getElementById("askResult");
   const card=D.createElement("div");card.className="card";
@@ -352,7 +356,37 @@ function startGuided(q,chap){
   rev.onclick=()=>gsReveal(G);acts.appendChild(rev);
   const end=D.createElement("span");end.className="chip";end.textContent="结束引导";
   end.onclick=()=>gsClose(G,false);acts.appendChild(end);
-  gsStep(G);
+  if(opts.review){gsStep(G);return}
+  /* —— v7.5 开讲前读心确认：孩子先说要什么，AI 开场直接针对卡点 —— */
+  st.textContent="";
+  const MW=D.createElement("div");MW.className="mindbox";
+  MW.innerHTML='<div style="font-weight:700">🧠 开讲前，老师先读懂你（10 秒）</div>'
+    +'<div class="mlabel">① 这题在问什么？（用自己的话说，说不出可以不填）</div>'
+    +'<input type="text" class="minput" placeholder="比如：算两个人骑车谁快…">'
+    +'<div class="mlabel">② 你现在卡在哪？（点一个）</div>'
+    +'<div class="chips mstuck"></div>'
+    +'<div class="mlabel">③ 想让老师从哪开始带你？（点一个，可不点）</div>'
+    +'<div class="chips mfrom"></div>'
+    +'<div class="row" style="margin-top:10px"><button class="btn pri sm mgo">🧠 带着这些开始引导</button><button class="btn sm mskip">跳过，直接开始</button></div>';
+  const STUCK=["看不太懂题意","不知道设谁为 x","找不出等量关系","式子列得出但不会解","还没认真想，就是懵"];
+  const FROM=["从读题开始","从设未知数开始","从找数量关系开始","我先自己试试"];
+  const sBox=MW.querySelector(".mstuck"),fBox=MW.querySelector(".mfrom");
+  function mkChips(arr,box){arr.forEach(t=>{const b=D.createElement("span");b.className="chip";b.textContent=t;
+    b.onclick=()=>{[...box.querySelectorAll(".chip")].forEach(x=>x.classList.toggle("on",x===b))};box.appendChild(b)})}
+  mkChips(STUCK,sBox);mkChips(FROM,fBox);
+  chatBox.appendChild(MW);
+  MW.querySelector(".mskip").onclick=()=>{MW.remove();gsStep(G)};
+  MW.querySelector(".mgo").onclick=()=>{
+    const say=MW.querySelector(".minput").value.trim();
+    const stuck=sBox.querySelector(".chip.on"),from=fBox.querySelector(".chip.on");
+    let ctx="\n【开讲前读心·孩子自述】";
+    ctx+="\n·这题在问："+(say||"孩子说不上来（说明题意还没读懂，开场先带TA读题）");
+    ctx+="\n·卡点："+(stuck?stuck.textContent:"孩子没选");
+    ctx+="\n·希望从哪开始："+(from?from.textContent:"孩子没说");
+    ctx+="\n（读心规则【必须执行】：开场说清这题在问什么之后，紧跟的关键线索必须直接回应卡点、并明确说出下一步动作——卡点是「不知道设谁为x」：直接告诉TA“题目最后一句问什么，就设什么为x”（这是方法指导，不算泄答案），再让TA照这个设法说说每个量怎么表示；卡点是「找不出等量关系」：帮TA指出题里“谁比谁多/少”或“哪个量前后两次没变”的那句话；卡点是「看不太懂题意」：带TA把题目逐句翻译成人话再问思路；卡点是「式子列得出但不会解」：让TA把列的式子发出来，从那里接着教；选了「我先自己试试」：不给线索，只问思路。所有线索绝不包含最终答案。）";
+    G.msgs[0].content+=ctx;
+    MW.remove();gsStep(G);
+  };
 }
 function gsChip(G,label,prompt){
   const b=D.createElement("span");b.className="chip";b.textContent=label;
@@ -768,7 +802,7 @@ function reviewRedo(id){
   const oldSubj=S.subj;
   if(w.subj&&SUBJ[w.subj])S.subj=w.subj;
   showTab("tab-ask");
-  startGuided(w.q,w.chap||"");
+  startGuided(w.q,w.chap||"",{review:true}); // 复盘重做：跳过读心表单，直接测还记不记得
   if(GS)GS.reviewId=id;
   S.subj=oldSubj;
 }
