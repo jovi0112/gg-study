@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>果果学习版 v7.5</title>
+<title>果果学习版 v7.6</title>
 <style>
 :root{--bg:#f4f6fa;--card:#fff;--ink:#1c2333;--sub:#66708a;--pri:#3b6ef5;--pri2:#eef3ff;--ok:#1a9e5c;--warn:#c2410c;--line:#e3e8f2;--red:#d64545}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -66,7 +66,7 @@ details{margin-top:6px}summary{cursor:pointer;color:var(--pri);font-size:13px}
 </style>
 </head>
 <body>
-<header><b>果果学习版 <i>v7.5</i></b><span style="display:flex;gap:8px;align-items:center"><span id="qChip" onclick="quotaInfo()" title="累计AI流量">⚡…</span><button class="btn sm" onclick="showTab('tab-set')">⚙ 设置</button></span></header>
+<header><b>果果学习版 <i>v7.6</i></b><span style="display:flex;gap:8px;align-items:center"><span id="qChip" onclick="quotaInfo()" title="累计AI流量">⚡…</span><button class="btn sm" onclick="showTab('tab-set')">⚙ 设置</button></span></header>
 <nav id="tabs">
   <button class="on" data-t="tab-ask" onclick="showTab('tab-ask')">💬 讲题</button>
   <button data-t="tab-photo" onclick="showTab('tab-photo')">📷 拍题</button>
@@ -152,6 +152,7 @@ details{margin-top:6px}summary{cursor:pointer;color:var(--pri);font-size:13px}
   <div class="card">
     <h3>错题本 <span id="dueBadge" class="tag red"></span></h3>
     <div id="planCard" style="margin-bottom:8px"></div>
+    <div id="selBar" class="hide" style="margin:8px 0"></div>
     <div class="chips" id="wFilter"></div>
     <div id="wrongList" style="margin-top:10px"></div>
   </div>
@@ -759,10 +760,39 @@ async function exportMaps(){
 
 /* ---------- 错题本 ---------- */
 function addWrong(w){
-  w.id=Date.now();w.t=Date.now();w.stage=0;w.due=Date.now()+EBB[0]*864e5;
+  w.id=Date.now();while(S.wrong.some(x=>x.id===w.id))w.id++; // 同毫秒连收/导入合并防撞id
+  w.t=Date.now();w.stage=0;w.due=Date.now()+EBB[0]*864e5;
   S.wrong.unshift(w);if(S.wrong.length>200)S.wrong.pop();save();
 }
 let wFilter="";
+let wrongSel={}; // 勾选去生成导图的错题 id（临时态，不落库）
+function selWrong(id,on){if(on)wrongSel[id]=1;else delete wrongSel[id];renderSelBar()}
+function renderSelBar(){
+  const bar=D.getElementById("selBar");if(!bar)return;
+  const n=Object.keys(wrongSel).filter(id=>S.wrong.find(w=>w.id===+id)).length;
+  if(!n){bar.classList.add("hide");bar.innerHTML="";return}
+  bar.classList.remove("hide");
+  bar.innerHTML='<div class="wcard" style="background:#eef2ff;border-color:#c7d2fe"><b>🧠 已选 '+n+' 题</b> '+
+    '<button class="btn pri sm" onclick="goMapFromWrong()">生成思维导图</button> '+
+    '<button class="btn sm" onclick="wrongSel={};renderSelBar();renderWrong()">清空选择</button>'+
+    '<div class="state" style="margin:2px 0 0">生成后自动按科目选样式，可「📥 存为图片」导出 PNG</div></div>';
+}
+function goMapFromWrong(){
+  const ids=Object.keys(wrongSel).map(Number).filter(id=>S.wrong.find(w=>w.id===id));
+  if(!ids.length){toast("先勾选要梳理的错题");return}
+  const items=ids.map(id=>S.wrong.find(w=>w.id===id)).slice(0,8);
+  const cnt={};items.forEach(w=>{if(w.subj)cnt[w.subj]=(cnt[w.subj]||0)+1});
+  const subj=Object.keys(cnt).sort((a,b)=>cnt[b]-cnt[a])[0]||S.subj;
+  const mixed=Object.keys(cnt).length>1;
+  if(SUBJ[subj])S.subj=subj;
+  const topic="错题知识点梳理（"+items.length+" 道错题，把它们涉及的知识点整理成一张复习图）："+items.map(w=>w.q.slice(0,90)).join(" ／ ");
+  showTab("tab-map");
+  renderSubj();
+  D.getElementById("mapTopic").value=topic;
+  genMap();
+  wrongSel={};renderSelBar();
+  toast(mixed?("选了多科错题，按「"+(SUBJ[subj]?SUBJ[subj].n:subj)+"」生成"):"已带到导图页，生成中…");
+}
 function renderWrong(){
   const list=D.getElementById("wrongList"),fbox=D.getElementById("wFilter");
   fbox.innerHTML='<span class="chip'+(!wFilter?" on":"")+'" onclick="wFilter=\'\';renderWrong()">全部</span>'+TAGS.map(t=>'<span class="chip'+(wFilter===t?" on":"")+'" onclick="wFilter=\''+t+'\';renderWrong()">'+t+'</span>').join("");
@@ -772,6 +802,7 @@ function renderWrong(){
   const badge=D.getElementById("dueBadge");badge.textContent=dueN?("今天该复盘 "+dueN+" 条"):badge.textContent="";
   if(!dueN)badge.classList.add("hide");else badge.classList.remove("hide");
   updateDueBadge();
+  renderSelBar();
   // 复盘计划卡
   const plan=D.getElementById("planCard");
   const dueItems=S.wrong.filter(w=>w.due<=now).sort((a,b)=>a.due-b.due);
@@ -783,7 +814,7 @@ function renderWrong(){
   if(!items.length){list.innerHTML='<div class="state">还没有错题。讲题页有「收进错题本」按钮。</div>';return}
   list.innerHTML=items.map(w=>{
     const due=w.due<=now?'<span class="due today">该复盘了！</span>':'<span class="due">'+new Date(w.due).toLocaleDateString("zh-CN")+' 复盘</span>';
-    return '<div class="wcard"><div class="qtext">'+esc(w.q.slice(0,140))+'</div>'+
+    return '<div class="wcard"><label style="display:flex;align-items:flex-start;gap:6px;cursor:pointer"><input type="checkbox" style="margin-top:3px;flex:none" '+(wrongSel[w.id]?"checked":"")+' onclick="event.stopPropagation();selWrong('+w.id+',this.checked)"><div class="qtext">'+esc(w.q.slice(0,140))+'</div></label>'+
       (w.tag?'<span class="tag red">'+esc(w.tag)+'</span>':'')+
       '<span class="tag">'+esc(SUBJ[w.subj]?SUBJ[w.subj].n:w.subj||"")+(w.chap?("·"+esc(w.chap)):"")+'</span> '+due+
       '<details><summary>看讲解</summary><div class="answer">'+fmt(w.text)+'</div></details>'+
