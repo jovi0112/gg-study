@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>果果学习版 v7.6</title>
+<title>果果学习版 v7.7</title>
 <style>
 :root{--bg:#f4f6fa;--card:#fff;--ink:#1c2333;--sub:#66708a;--pri:#3b6ef5;--pri2:#eef3ff;--ok:#1a9e5c;--warn:#c2410c;--line:#e3e8f2;--red:#d64545}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -66,7 +66,7 @@ details{margin-top:6px}summary{cursor:pointer;color:var(--pri);font-size:13px}
 </style>
 </head>
 <body>
-<header><b>果果学习版 <i>v7.6</i></b><span style="display:flex;gap:8px;align-items:center"><span id="qChip" onclick="quotaInfo()" title="累计AI流量">⚡…</span><button class="btn sm" onclick="showTab('tab-set')">⚙ 设置</button></span></header>
+<header><b>果果学习版 <i>v7.7</i></b><span style="display:flex;gap:8px;align-items:center"><span id="qChip" onclick="quotaInfo()" title="累计AI流量">⚡…</span><button class="btn sm" onclick="showTab('tab-set')">⚙ 设置</button></span></header>
 <nav id="tabs">
   <button class="on" data-t="tab-ask" onclick="showTab('tab-ask')">💬 讲题</button>
   <button data-t="tab-photo" onclick="showTab('tab-photo')">📷 拍题</button>
@@ -685,20 +685,47 @@ function mapPNG(spec,subj){
   holder.innerHTML='<div class="mm" data-s="'+(subj||"math")+'" style="font-family:system-ui,-apple-system,\'PingFang SC\',\'Microsoft YaHei\',sans-serif;background:#fff;padding:16px;border-radius:12px">'+inner+'</div>';
   D.body.appendChild(holder);
   const el=holder.querySelector(".mm");
-  const w=el.offsetWidth,h=el.offsetHeight,outer=el.outerHTML;
+  const w=el.offsetWidth||600,h=el.offsetHeight||400,outer=el.outerHTML;
   holder.remove();
-  if(!w||!h)return Promise.reject(new Error("导图为空"));
-  const S2=(w*h>1.6e6)?1:2; // 图太大降为1x，防手机 canvas 尺寸上限
-  const xhtml='<div xmlns="http://www.w3.org/1999/xhtml" style="width:'+w+'px"><style>'+MAP_CSS+'</style>'+outer+'</div>';
-  const svg='<svg xmlns="http://www.w3.org/2000/svg" width="'+(w*S2)+'" height="'+(h*S2)+'" viewBox="0 0 '+w+' '+h+'"><foreignObject width="'+w+'" height="'+h+'">'+xhtml+'</foreignObject></svg>';
+  /* 根因(2026-11-18实测)：SVG data URI 是独立文档，字体度量与页面不同，
+     页面里量的 w/h 在独立环境里会重排（实测 506x360 → 实渲 546x316），
+     按 w/h 定 foreignObject 会把右列/底部硬裁掉。
+     修法：foreignObject 给足宽裕空间，画完按内容像素自动裁剪到真实边界 */
+  const W=Math.min(Math.max(Math.round(w*1.6)+240,900),4000);
+  const H=Math.min(Math.max(Math.round(h*1.6)+300,800),4000);
+  const S2=(W*H<=2.2e6&&H*2<=4096&&W*2<=4096)?2:1; // 面积/最大边都放得下才上 2x，防手机 canvas 尺寸上限
+  const xhtml='<div xmlns="http://www.w3.org/1999/xhtml" style="width:'+W+'px"><style>'+MAP_CSS+'.mm{min-width:0!important}</style>'+outer+'</div>';
+  const svg='<svg xmlns="http://www.w3.org/2000/svg" width="'+(W*S2)+'" height="'+(H*S2)+'" viewBox="0 0 '+W+' '+H+'"><foreignObject width="'+W+'" height="'+H+'">'+xhtml+'</foreignObject></svg>';
   return new Promise((res,rej)=>{
     const img=new Image();
-    img.onload=()=>{const cv=D.createElement("canvas");cv.width=w*S2;cv.height=h*S2;
+    img.onload=()=>{try{
+      const cv=D.createElement("canvas");cv.width=W*S2;cv.height=H*S2;
       const g=cv.getContext("2d");g.fillStyle="#fff";g.fillRect(0,0,cv.width,cv.height);
-      g.drawImage(img,0,0,cv.width,cv.height);res(cv)};
+      g.drawImage(img,0,0,cv.width,cv.height);
+      res(cropToContent(cv));
+    }catch(e){rej(e)}};
     img.onerror=()=>rej(new Error("图片合成失败（浏览器限制）"));
     img.src="data:image/svg+xml;charset=utf-8,"+encodeURIComponent(svg);
   });
+}
+/* 按非白像素找内容真实边界，裁掉多余空白（四周留 24px 呼吸边） */
+function cropToContent(cv){
+  const g=cv.getContext("2d"),cw=cv.width,ch=cv.height;
+  const d=g.getImageData(0,0,cw,ch).data;
+  let x0=cw,y0=ch,x1=-1,y1=-1;
+  for(let y=0;y<ch;y+=2)for(let x=0;x<cw;x+=2){
+    const i=(y*cw+x)*4;
+    if(d[i]<246||d[i+1]<246||d[i+2]<246){
+      if(x<x0)x0=x;if(y<y0)y0=y;if(x>x1)x1=x;if(y>y1)y1=y;
+    }
+  }
+  if(x1<0)return cv; // 全白兜底，原样返回
+  const M=24;
+  x0=Math.max(0,x0-M);y0=Math.max(0,y0-M);
+  x1=Math.min(cw-1,x1+M);y1=Math.min(ch-1,y1+M);
+  const o=D.createElement("canvas");o.width=x1-x0+1;o.height=y1-y0+1;
+  o.getContext("2d").drawImage(cv,x0,y0,o.width,o.height,0,0,o.width,o.height);
+  return o;
 }
 function dlCanvas(cv,fname){
   return new Promise((res,rej)=>cv.toBlob(b=>{
