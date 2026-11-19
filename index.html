@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>果果学习版 v7.8</title>
+<title>果果学习版 v7.9</title>
 <style>
 :root{--bg:#f4f6fa;--card:#fff;--ink:#1c2333;--sub:#66708a;--pri:#3b6ef5;--pri2:#eef3ff;--ok:#1a9e5c;--warn:#c2410c;--line:#e3e8f2;--red:#d64545}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -66,7 +66,7 @@ details{margin-top:6px}summary{cursor:pointer;color:var(--pri);font-size:13px}
 </style>
 </head>
 <body>
-<header><b>果果学习版 <i>v7.8</i></b><span style="display:flex;gap:8px;align-items:center"><span id="qChip" onclick="quotaInfo()" title="累计AI流量">⚡…</span><button class="btn sm" onclick="showTab('tab-set')">⚙ 设置</button></span></header>
+<header><b>果果学习版 <i>v7.9</i></b><span style="display:flex;gap:8px;align-items:center"><span id="qChip" onclick="quotaInfo()" title="累计AI流量">⚡…</span><button class="btn sm" onclick="showTab('tab-set')">⚙ 设置</button></span></header>
 <nav id="tabs">
   <button class="on" data-t="tab-ask" onclick="showTab('tab-ask')">💬 讲题</button>
   <button data-t="tab-photo" onclick="showTab('tab-photo')">📷 拍题</button>
@@ -321,7 +321,27 @@ function renderSubj(){
 /* ---------- 讲题核心：思路分支引导（v6，绝不直接给答案） ---------- */
 /* v7：学段锚定——每条提示词都带 学段/年级/科目/章节，并明令不许超纲 */
 function baseSys(){return "你是给"+ageOf()+"讲题的老师。铁律：全程简体中文；像家长讲题，不要书面腔；先易后难；题目转述里如有错别字，按上下文猜含义再答，不要纠结；不确定的明说不确定。讲解深度必须严格贴合"+S.stage+S.grade+"教材：不许用后面年级才学的方法（超纲），也不要过于浅显（降智）。"}
-function branchSys(){return baseSys()+"\n你现在处于【思路分支引导】模式——这是本产品最大的特色：绝不直接给答案。规则：\n①第一回合：先用≤50字说这题在问什么，再列1-2条关键线索，最后必须以「你的思路是？说说你打算怎么做，哪怕只想到第一步」结尾。不许开始讲正确解法。\n②孩子说了想法后，严格按这个格式回：\n【跟着你走】按孩子的思路往下推，说清楚照这样做会得到什么结果；\n【岔路口】指出从哪一步开始跑偏、为什么会跑偏（孩子思路里对的部分先肯定）；\n【反问】只提一个问题，把孩子拉回正路。不许在【跟着你走】【岔路口】里给出正确解法或最终答案。\n③孩子每做对一步就明确肯定，再引向下一步。\n④当孩子自己说出正确结果时，第一行以【通关】开头，先肯定，再让孩子用自己的话复述关键的一步。\n⑤【零思路救援】孩子说「不知道/不会/没思路」时：\n　·第1次：绝不重复问「再想想」。把题目拆到最小：只拎出题目的第一个条件或第一个数字，问「光看这个，它能告诉你什么？」。\n　·第2次仍不知道（或孩子点了救援按钮）：第一行以【铺垫】开头，进入铺垫模式——先带孩子把原题拆成「已知__，要求__」两个填空让TA补全，然后出一道同章节、知识点相同但数字明显更简单的热身题，让孩子先做热身题。\n　·热身题孩子答对：直接肯定。答错或说不知道：先给一句纠错提示让TA再试一次；TA再答错或再说不知道，就直接给热身题的答案和一句讲解（热身题是新题，可以给答案），然后只问「刚才那题用的方法，放到原题上，第一步该做什么？」——这一步只提问，绝不替孩子算出原题的任何中间结果或最终答案；孩子说出第一步后再按规则②正常引导。\n　·铁律：铺垫和热身题里也绝不出现原题的最终答案；任何回合都不许写出原题的完整解方程过程或最终解（哪怕孩子答对了热身题）。\n⑥每轮回复≤180字，口语化，多用「你」。除非孩子明确点了「看完整讲解」（那时系统会附加指令），全程禁止出现本题的最终数值答案或完整解题步骤。"}
+/* v7.9 分科引导守则：开场和追问按科目切换主线，不再千科一面 */
+const SUBJECT_GUIDE={
+  math:"本学科引导主线：读题翻成人话→圈出已知和要求→找等量关系→设未知数→列式求解。开口优先问「题里哪句话在说数量关系」，鼓励孩子先说出设谁为x。",
+  chin:"本学科引导主线：先审题（什么文体/任务、要表达什么情感或道理）→再想内容（中心是什么、用什么例子或理由）→最后才是结构和语言。仿写/仿写句式题：先带孩子抓例文的特点（对偶/比喻/节奏/用词），让孩子仿「结构和风格」，不是抄「意思」。口语化引导，多问「你想让读的人感受到什么」。",
+  eng:"本学科引导主线：先判断考点（时态/词性/固定搭配/句型）→回忆学过的搭配和规则→再动笔。开口优先问「这题在考哪个语法点」，引导找句子里标志词（如 yesterday/every day/how many），先说选什么再说说为什么。",
+  pol:"本学科引导主线：是什么→为什么→怎么做三步走。开口优先问「材料里说了一件什么事」，引导把材料里的行为和课本知识点对号入座，答题按角度分点想。",
+  bio:"本学科引导主线：结构→功能→过程。开口优先问「这是在考哪个结构或哪个过程」，引导先把过程按顺序说一遍，再补齐课本术语。",
+  geo:"本学科引导主线：先看图/定位（在哪里、什么地形气候河流）→自然方面→人文方面。开口优先问「这道题的图（或材料）先看哪里」，引导分自然和人文两个角度想。",
+  his:"本学科引导主线：按时间线四要素走——背景→经过→结果→影响。开口优先问「这件事发生在什么背景之下」，引导先把时间线捋直再答影响。"
+};
+/* v7.9 分科读心表单：卡点/起步选项贴合科目（math 为默认兜底） */
+const MATH_UI={ph:"比如：算两个人骑车谁快…",stuck:["看不太懂题意","不知道设谁为 x","找不出等量关系","式子列得出但不会解","还没认真想，就是懵"],from:["从读题开始","从设未知数开始","从找数量关系开始","我先自己试试"]};
+const GUIDE_UI={
+  chin:{ph:"比如：想写一封信夸夸同学…",stuck:["不知道写什么内容","不知道怎么开头","想不出例子或理由","仿不出例文的句式","还没认真想，就是懵"],from:["从审题开始","从想中心意思开始","从列提纲开始","我先自己试试"]},
+  eng:{ph:"比如：这里选 on 还是 in…",stuck:["不知道考哪个语法点","时态拿不准","单词/搭配想不起来","句子结构看不懂","还没认真想，就是懵"],from:["从判断考点开始","从找标志词开始","从回忆搭配开始","我先自己试试"]},
+  pol:{ph:"比如：该怎么帮这位同学…",stuck:["材料读不懂","不知道答哪几个角度","课本知识点想不起来","说不清为什么","还没认真想，就是懵"],from:["从读材料开始","从『是什么』开始","从回忆知识点开始","我先自己试试"]},
+  bio:{ph:"比如：细胞是怎么工作的…",stuck:["不知道考哪个结构/过程","课本术语说不准","过程顺序记不清","还没认真想，就是懵"],from:["从读题开始","从回忆结构开始","从画过程图开始","我先自己试试"]},
+  geo:{ph:"比如：为什么这里降水多…",stuck:["图/材料看不懂","不知道答自然还是人文","区域特征想不全","还没认真想，就是懵"],from:["从看图定位开始","从自然方面开始","从人文方面开始","我先自己试试"]},
+  his:{ph:"比如：这场变化有什么影响…",stuck:["时间/背景搞不清","不知道答哪几个要素","史实记不清","还没认真想，就是懵"],from:["从理时间线开始","从背景开始","从影响开始","我先自己试试"]}
+};
+function branchSys(){return baseSys()+"\n你现在处于【思路分支引导】模式——这是本产品最大的特色：绝不直接给答案。规则：\n①第一回合：先用≤50字说这题在问什么，再列1-2条关键线索，最后必须以「你的思路是？说说你打算怎么做，哪怕只想到第一步」结尾。不许开始讲正确解法。开场和后面的引导要按【本学科引导守则】的主线来，不同科目引导的切入角度不一样。\n②孩子说了想法后，严格按这个格式回：\n【跟着你走】按孩子的思路往下推，说清楚照这样做会得到什么结果；\n【岔路口】指出从哪一步开始跑偏、为什么会跑偏（孩子思路里对的部分先肯定）；\n【反问】只提一个问题，把孩子拉回正路。不许在【跟着你走】【岔路口】里给出正确解法或最终答案。\n③孩子每做对一步就明确肯定，再引向下一步。\n④当孩子自己说出正确结果时，第一行以【通关】开头，先肯定，再让孩子用自己的话复述关键的一步。\n⑤【零思路救援】孩子说「不知道/不会/没思路」时：\n　·第1次：绝不重复问「再想想」。把题目拆到最小：只拎出题目的第一个条件或第一个数字，问「光看这个，它能告诉你什么？」。\n　·第2次仍不知道（或孩子点了救援按钮）：第一行以【铺垫】开头，进入铺垫模式——先带孩子把原题拆成「已知__，要求__」两个填空让TA补全，然后出一道同章节、知识点相同但数字明显更简单的热身题，让孩子先做热身题。\n　·热身题孩子答对：直接肯定。答错或说不知道：先给一句纠错提示让TA再试一次；TA再答错或再说不知道，就直接给热身题的答案和一句讲解（热身题是新题，可以给答案），然后只问「刚才那题用的方法，放到原题上，第一步该做什么？」——这一步只提问，绝不替孩子算出原题的任何中间结果或最终答案；孩子说出第一步后再按规则②正常引导。\n　·铁律：铺垫和热身题里也绝不出现原题的最终答案；任何回合都不许写出原题的完整解方程过程或最终解（哪怕孩子答对了热身题）。\n⑥每轮回复≤180字，口语化，多用「你」。除非孩子明确点了「看完整讲解」（那时系统会附加指令），全程禁止出现本题的最终数值答案或完整解题步骤。"+(SUBJECT_GUIDE[S.subj]?"\n【本学科引导守则】"+SUBJECT_GUIDE[S.subj]:"")}
 let GS=null; // 当前引导会话
 function ask(){
   const q=D.getElementById("qBox").value.trim();
@@ -330,7 +350,7 @@ function ask(){
   startGuided(q,chap);
 }
 function gsSaveHist(G){
-  const talk=G.msgs.filter(m=>m.role!=="system").map(m=>(m.role==="assistant"?"老师：":"我：")+m.content).join("\n");
+  const talk=G.msgs.filter(m=>m.role!=="system").map(m=>(m.role==="assistant"?"老师：":"我：")+(m.disp||m.content)).join("\n"); // v7.9: 历史里显示孩子视角的短话，不漏内部指令
   S.hist.unshift({t:Date.now(),subj:S.subj,chap:G.chap||"",q:G.q,text:talk.slice(0,900),via:G.via||""});
   if(S.hist.length>80)S.hist.pop();save();
 }
@@ -351,26 +371,26 @@ function startGuided(q,chap,opts){
   box.insertBefore(card,box.firstChild);
   const G=GS={q,chap,rounds:0,done:false,ended:false,revealed:false,via:"",msgs:[{role:"system",content:branchSys()},{role:"user",content:"学段："+S.stage+S.grade+"，科目："+SUBJ[S.subj].n+(chap?("，章节："+chap):"")+"。\n题目："+q}],card,chatBox,st,inWrap,ta,send,acts};
   send.onclick=()=>gsSend(G);
-  gsChip(G,"📕 红笔批改(读心)","（孩子点了「红笔批改」：请暂停引导流程，结合上面整段对话，用红笔批改的口吻指出我可能在哪一步、哪个概念上想岔了——严厉但温和，不嘲笑但不回避。可以点出正确的概念方向，但不要给出本题的最终数值答案。）");
-  gsChip(G,"🆘 一点思路都没有","（孩子确认完全没有任何思路，请立即按规则⑤进入铺垫模式：先把原题拆成「已知__，要求__」两个填空让我补全，然后出一道同章节、数字明显更简单的热身题让我先做。热身题答完你可以给它的答案，但映射回原题时只提问「第一步该做什么」，绝不替我算出原题的任何中间结果或最终答案。）");
+  gsChip(G,"📕 红笔批改(读心)","（孩子点了「红笔批改」：请暂停引导流程，结合上面整段对话，用红笔批改的口吻指出我可能在哪一步、哪个概念上想岔了——严厉但温和，不嘲笑但不回避。可以点出正确的概念方向，但不要给出本题的最终数值答案。）","老师，请用红笔批改的口吻帮我看看，我哪一步想岔了");
+  gsChip(G,"🆘 一点思路都没有","（孩子点了「一点思路都没有」按钮：TA 确认真的一点思路都没有，请直接按规则⑤第2次进入铺垫模式——先拆「已知__，要求__」两个填空让TA补全，再出一道同章节、数字明显更简单的热身题。回原题时只提问第一步，绝不替算。）","老师，我一点思路都没有，请带我一步步来");
   const rev=D.createElement("span");rev.className="chip";rev.textContent="🔍 看完整讲解";
   rev.onclick=()=>gsReveal(G);acts.appendChild(rev);
   const end=D.createElement("span");end.className="chip";end.textContent="结束引导";
   end.onclick=()=>gsClose(G,false);acts.appendChild(end);
   if(opts.review){gsStep(G);return}
-  /* —— v7.5 开讲前读心确认：孩子先说要什么，AI 开场直接针对卡点 —— */
+  /* —— v7.5 开讲前读心确认：孩子先说要什么，AI 开场直接针对卡点（v7.9 选项按科目切换） —— */
   st.textContent="";
+  const UI=GUIDE_UI[S.subj]||MATH_UI;
   const MW=D.createElement("div");MW.className="mindbox";
   MW.innerHTML='<div style="font-weight:700">🧠 开讲前，老师先读懂你（10 秒）</div>'
     +'<div class="mlabel">① 这题在问什么？（用自己的话说，说不出可以不填）</div>'
-    +'<input type="text" class="minput" placeholder="比如：算两个人骑车谁快…">'
+    +'<input type="text" class="minput" placeholder="'+esc(UI.ph)+'">'
     +'<div class="mlabel">② 你现在卡在哪？（点一个）</div>'
     +'<div class="chips mstuck"></div>'
     +'<div class="mlabel">③ 想让老师从哪开始带你？（点一个，可不点）</div>'
     +'<div class="chips mfrom"></div>'
     +'<div class="row" style="margin-top:10px"><button class="btn pri sm mgo">🧠 带着这些开始引导</button><button class="btn sm mskip">跳过，直接开始</button></div>';
-  const STUCK=["看不太懂题意","不知道设谁为 x","找不出等量关系","式子列得出但不会解","还没认真想，就是懵"];
-  const FROM=["从读题开始","从设未知数开始","从找数量关系开始","我先自己试试"];
+  const STUCK=UI.stuck,FROM=UI.from;
   const sBox=MW.querySelector(".mstuck"),fBox=MW.querySelector(".mfrom");
   function mkChips(arr,box){arr.forEach(t=>{const b=D.createElement("span");b.className="chip";b.textContent=t;
     b.onclick=()=>{[...box.querySelectorAll(".chip")].forEach(x=>x.classList.toggle("on",x===b))};box.appendChild(b)})}
@@ -384,18 +404,18 @@ function startGuided(q,chap,opts){
     ctx+="\n·这题在问："+(say||"孩子说不上来（说明题意还没读懂，开场先带TA读题）");
     ctx+="\n·卡点："+(stuck?stuck.textContent:"孩子没选");
     ctx+="\n·希望从哪开始："+(from?from.textContent:"孩子没说");
-    ctx+="\n（读心规则【必须执行】：开场说清这题在问什么之后，紧跟的关键线索必须直接回应卡点、并明确说出下一步动作——卡点是「不知道设谁为x」：直接告诉TA“题目最后一句问什么，就设什么为x”（这是方法指导，不算泄答案），再让TA照这个设法说说每个量怎么表示；卡点是「找不出等量关系」：帮TA指出题里“谁比谁多/少”或“哪个量前后两次没变”的那句话；卡点是「看不太懂题意」：带TA把题目逐句翻译成人话再问思路；卡点是「式子列得出但不会解」：让TA把列的式子发出来，从那里接着教；选了「我先自己试试」：不给线索，只问思路。所有线索绝不包含最终答案。）";
+    ctx+="\n（读心规则【必须执行】：开场说清这题在问什么之后，紧跟的关键线索必须直接回应卡点、并明确说出下一步动作——卡点是「不知道设谁为x」：直接告诉TA“题目最后一句问什么，就设什么为x”（这是方法指导，不算泄答案），再让TA照这个设法说说每个量怎么表示；卡点是「找不出等量关系」：帮TA指出题里“谁比谁多/少”或“哪个量前后两次没变”的那句话；卡点是「看不太懂题意」：带TA把题目逐句翻译成人话再问思路；卡点是「式子列得出但不会解」：让TA把列的式子发出来，从那里接着教；选了「我先自己试试」：不给线索，只问思路。【非数学学科通用规则】孩子选了上面没列到的卡点时，按本学科引导守则的主线，直接给该卡点方向的下一步动作（如语文「不知道写什么内容」→先帮TA定中心和情感方向；英语「不知道考哪个语法点」→提示找标志词判断考点），都是方法指导不算泄答案，绝不给出本题答案。）";
     G.msgs[0].content+=ctx;
     MW.remove();gsStep(G);
   };
 }
-function gsChip(G,label,prompt){
+function gsChip(G,label,prompt,disp){
   const b=D.createElement("span");b.className="chip";b.textContent=label;
   b.onclick=()=>{
     if(G.ended){toast("这一题的引导已结束");return}
     if(G.busy){toast("老师还在想，等他这句说完再点哦");return}
-    G.msgs.push({role:"user",content:prompt});
-    const m=D.createElement("div");m.className="gmsg me";m.textContent=label;G.chatBox.appendChild(m);
+    G.msgs.push({role:"user",content:prompt,disp:disp||label}); // v7.9: disp 是给孩子/历史看的短话，content 是给 AI 的指令
+    const m=D.createElement("div");m.className="gmsg me";m.textContent=disp||label;G.chatBox.appendChild(m);
     gsStep(G);
   };
   G.acts.insertBefore(b,G.acts.querySelector(".chip:last-child")); // 排在「结束引导」前
@@ -423,7 +443,7 @@ function gsSend(G){
   gsStep(G);
 }
 function gsWin(G){
-  gsChip(G,"出3道变式","（孩子已经自己做出这道题了。请围绕它的知识点出3道难度贴合"+S.stage+S.grade+"教材的变式题，由易到难，答案与题目分开、放在最后。）");
+  gsChip(G,"出3道变式","（孩子已经自己做出这道题了。请围绕它的知识点出3道难度贴合"+S.stage+S.grade+"教材的变式题，由易到难，答案与题目分开、放在最后。）","老师，请出3道变式题让我练练");
   if(G.reviewId){ // 这是复盘重做：通关即自动顺延复盘期
     const w=S.wrong.find(x=>x.id===G.reviewId);
     if(w){w.stage=Math.min(w.stage+1,EBB.length-1);w.due=Date.now()+EBB[w.stage]*864e5;save();updateDueBadge();toast("复盘完成！"+EBB[w.stage]+"天后再来")}
