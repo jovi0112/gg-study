@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>果果学习版 v7.9</title>
+<title>果果学习版 v7.10</title>
 <style>
 :root{--bg:#f4f6fa;--card:#fff;--ink:#1c2333;--sub:#66708a;--pri:#3b6ef5;--pri2:#eef3ff;--ok:#1a9e5c;--warn:#c2410c;--line:#e3e8f2;--red:#d64545}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -66,7 +66,7 @@ details{margin-top:6px}summary{cursor:pointer;color:var(--pri);font-size:13px}
 </style>
 </head>
 <body>
-<header><b>果果学习版 <i>v7.9</i></b><span style="display:flex;gap:8px;align-items:center"><span id="qChip" onclick="quotaInfo()" title="累计AI流量">⚡…</span><button class="btn sm" onclick="showTab('tab-set')">⚙ 设置</button></span></header>
+<header><b>果果学习版 <i>v7.10</i></b><span style="display:flex;gap:8px;align-items:center"><span id="qChip" onclick="quotaInfo()" title="累计AI流量">⚡…</span><button class="btn sm" onclick="showTab('tab-set')">⚙ 设置</button></span></header>
 <nav id="tabs">
   <button class="on" data-t="tab-ask" onclick="showTab('tab-ask')">💬 讲题</button>
   <button data-t="tab-photo" onclick="showTab('tab-photo')">📷 拍题</button>
@@ -356,6 +356,9 @@ function gsSaveHist(G){
 }
 function startGuided(q,chap,opts){
   opts=opts||{};
+  // v7.10 统一入口：只在检测到明确的公式代码特征（反斜杠命令 / 成对的 $...$ 定界符 / 花括号上下标）时才清洗，
+  // 手输的普通文本（含 $5 之类单个货币符号）零影响；错题本里的旧脏题也不会回流讲题页。
+  if(/\\(?:[a-zA-Z]+|%)|\$[^$\n]{1,300}\$|_\{|\^\{/.test(q))q=cleanOcr(q).text;
   if(GS&&!GS.ended)gsClose(GS,true); // 上一题没结束就开新题，自动收尾
   const box=D.getElementById("askResult");
   const card=D.createElement("div");card.className="card";
@@ -496,23 +499,83 @@ function showPhoto(url){
   cancelCrop();
   ocrRun(url);
 }
+/* v7.10：数学式确定性清洗（不依赖模型自觉，所有 OCR 入口统一过关）
+   视觉模型常把印刷公式改写成 LaTeX，而本题框是纯文本、没有公式渲染器，
+   孩子会看到一堆 $ \oplus \cdots \left( 的代码。这里按语法特征兜底转成可读字符。 */
+const OCR_TEXMAP={oplus:"⊕",otimes:"⊗",times:"×",div:"÷",cdot:"·",cdots:"…",ldots:"…",dots:"…",
+  le:"≤",leq:"≤",ge:"≥",geq:"≥",neq:"≠",ne:"≠",approx:"≈",pm:"±",infty:"∞",sqrt:"√",
+  angle:"∠",triangle:"△",circ:"°",alpha:"α",beta:"β",gamma:"γ",theta:"θ",pi:"π",sum:"∑",int:"∫",
+  left:"",right:"",quad:" ",qquad:" ",text:"",mathrm:"",mathbf:"",displaystyle:"",frac:""};
+function cleanOcr(t){
+  if(!t)return {text:"",cleaned:0};
+  let n=0;
+  const GAP="\u0001";                                                        // 哨兵：保护填空横线不被下标清洗误吃
+  t=t.replace(/_{3,}|＿{2,}/g,GAP);
+  t=t.replace(/\$/g,()=>{n++;return ""});                                   // ① 去 $ 定界符
+  t=t.replace(/\\frac\{([^{}]*)\}\{([^{}]*)\}/g,(m,a,b)=>{n++;return a+"/"+b}); // ② 分式 a/b（必须先于去花括号）
+  t=t.replace(/\\([a-zA-Z]+|%)\s?/g,(m,k)=>{n++;return OCR_TEXMAP[k]!==undefined?OCR_TEXMAP[k]:k}); // ③ 命令→字符，连吞一个分隔空格
+  t=t.replace(/_\{([^{}]*)\}/g,(m,x)=>{n++;return x});                       // ④ 下标 a_{1} → a1
+  t=t.replace(/_([0-9A-Za-z])/g,(m,x)=>{n++;return x});                      //    下标 a_1 → a1
+  t=t.replace(/\^\{([^{}]*)\}/g,(m,x)=>{n++;return "^"+x});                   //    上标 x^{2} → x^2
+  t=t.replace(/[{}]/g,()=>{n++;return ""});                                   // ⑤ 剩余花括号
+  t=t.replace(/\s*([⊕⊗×÷≤≥≠≈±])\s*/g,"$1");                                  // ⑥ 二元运算符两侧多余空格
+  t=t.replace(/…\s+/g,"…");                                                   //    省略号后多余空格
+  t=t.replace(/[ \t]+\n/g,"\n");                                              // ⑦ 行尾空格
+  t=t.split(GAP).join("____");                                                 // 还原填空横线
+  return {text:t.trim(),cleaned:n};
+}
+/* v7.10：出口侧确定性兜底 —— 模型若仍在填空处填了答案，把它打回横线。
+   分两种形态：①带括号的数组答案 ②裸数值答案；都不碰题干里本来给的例子数字。 */
+function ocrStripAnswers(t){
+  let n=0;
+  const PRE="((?:输出)?结果为|答案为|应填)";
+  // ① 结果为(1,1) / 结果为（0,1,0）——整个括号数组一起吃掉
+  t=t.replace(new RegExp(PRE+"\\s*[（(][\\d.,，、\\s+\\-]*[）)]","g"),(m,pre)=>{n++;return pre+"____"});
+  // ② 结果为 5、结果为 3.14 ——裸数值（后面须跟标点或行尾，避免吞掉正文）
+  t=t.replace(new RegExp(PRE+"\\s*\\d[\\d.,\\s+\\-]*(?=[，,；;。、\\n]|$)","g"),(m,pre)=>{n++;return pre+"____"});
+  return {text:t,stripped:n};
+}
+/* v7.10：抄题自检 —— 不假装准确，把可疑点暴露给家长/孩子核对 */
+function ocrWarn(t){
+  const w=[];
+  if(/结果为|等于|答案为|输出为|应填|填\s*[（(]/.test(t) && !/_{3,}|＿{2,}|＿|□/.test(t))
+    w.push("⚠️ 没看到填空横线：请对照原图，确认 AI 没把答案偷偷填进去");
+  if(/\\|\$/.test(t)) w.push("⚠️ 仍残留公式代码，请手动改一下");
+  return w;
+}
+const OCR_RULES="【硬性规则·必须全部遵守】\n"
+  +"① 只抄题，绝对不讲题、不解题、不推算、不验证、不「顺手补全」。图里所有填空、横线、括号空白，一律原样保留成 ____ 或空格，绝不许替孩子填任何答案、数字或结果。\n"
+  +"② 数学式子写成普通人直接在文本框里能读的纯文本：圈加号就写 ⊕，省略号写 …，下标写 a1、a2、P0、P1（写成普通字母数字，不要写成下标代码），绝对值写 | |，分数线用 /。\n"
+  +"③ 严禁输出任何公式代码或排版标记：不许出现美元符号、反斜杠、花括号、单独的下划线、脱字符；只输出能在普通文本框里直接读的纯文本，不要任何代码式写法。\n"
+  +"④ 一字不差：数字、数组里的每一位、序号、运算符都按原图抄，不许改写或化简。图中有多题全部抄出并分行。认不清的字写 □。";
 async function ocrRun(dataUrl){
   const st=D.getElementById("ocrState");st.className="state";st.textContent="AI 抄写员正在读题…";
   D.getElementById("ocrBox").classList.add("hide");
   try{
     const p1=await chat([{role:"user",content:[
       {type:"image_url",image_url:{url:dataUrl}},
-      {type:"text",text:"你是题目抄写员。把图里的题目一字不差抄成纯文本（保留数学式子和序号），只抄题不讲题不解题。图中若有多题，全部抄出并分行。认不清的字写□。"}]}],{vision:true,max:900});
+      {type:"text",text:"你是题目抄写员，把图里的题目一字不差抄成纯文本。\n"+OCR_RULES}]}],{vision:true,max:900});
     st.textContent="抄好了，校对员正在逐字核对…";
     let p2=p1.text;
     try{
       const v=await chat([{role:"user",content:[
         {type:"image_url",image_url:{url:dataUrl}},
-        {type:"text",text:"下面是另一位抄写员抄的题目。请对照原图逐字校对，输出修正后的最终版本（只输出最终文本，不要解释）。仍认不清的字写□。\n--- 抄写稿 ---\n"+p1.text}]}],{vision:true,max:900});
+        {type:"text",text:"你是校对员，对照原图逐字核对下面这份抄写稿，输出修正后的最终版本（只输出最终文本，不要解释、不要加标题）。\n"
+          +"重点纠正 4 类错误：①抄写稿若在原图本来空着的地方（横线/括号空白）填了任何答案或数字，一律删掉并恢复成 ____；②若出现任何公式代码或排版标记（美元符号、反斜杠、花括号、单独下划线），改成普通可读字符（⊕、…、a1、P0 等）；③数字、数组、序号、运算符逐位核对是否与原图一致；④有没有漏抄或自行添加原图没有的整句。\n"
+          +OCR_RULES+"\n--- 抄写稿 ---\n"+cleanOcr(p1.text).text}]}],{vision:true,max:900});
       p2=v.text;
     }catch(e2){/* 校对失败就用第一遍 */}
-    st.textContent="";
-    D.getElementById("ocrText").value=p2;
+    const c=cleanOcr(p2);                       // 兜底①：不管模型听不听话，出口统一清洗公式代码
+    const a=ocrStripAnswers(c.text);            // 兜底②：填空处被填的答案打回横线
+    const final=a.text;
+    const warn=ocrWarn(final);
+    st.className="state"+(warn.length?" err":"");
+    const done=[];
+    if(c.cleaned)done.push("🧹 还原 "+c.cleaned+" 处公式代码");
+    if(a.stripped)done.push("🚫 撤掉 "+a.stripped+" 处被偷填的答案");
+    st.textContent=(done.length?done.join("、"):"抄好了")
+      +(warn.length?"；"+warn.join("；"):"；对照原图核对一下数字再开始");
+    D.getElementById("ocrText").value=final;
     D.getElementById("ocrBox").classList.remove("hide");
   }catch(e){
     st.className="state err";
